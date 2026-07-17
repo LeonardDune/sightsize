@@ -61,8 +61,16 @@ main { flex: 1; position: relative; overflow: hidden; }
   margin: 0 auto;
   width: 100%;
 }
-.screen.full { padding: 0; max-width: none; overflow: hidden; }
+.screen.full {
+  padding: 0;
+  max-width: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 .screen[hidden] { display: none; }
+
+.canvas-wrap { position: relative; flex: 1; min-height: 0; }
 
 h2 { font-size: 15px; font-weight: 600; margin: 22px 0 10px; }
 .muted { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
@@ -152,24 +160,17 @@ input:disabled { opacity: 0.45; }
 }
 
 .bar {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 0 0 auto;
   display: flex;
   gap: 8px;
   align-items: center;
-  background: #1d2026ee;
-  border: 1px solid #0009;
-  border-radius: 14px;
-  padding: 8px;
-  z-index: 10;
-  backdrop-filter: blur(6px);
-  max-width: calc(100% - 16px);
-  flex-wrap: wrap;
   justify-content: center;
+  flex-wrap: wrap;
+  background: var(--bg2);
+  border-top: 1px solid #0008;
+  padding: 8px;
 }
-.bar.bottom { bottom: calc(12px + env(safe-area-inset-bottom)); }
-.bar.above { bottom: calc(74px + env(safe-area-inset-bottom)); }
+.bar.main { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
 .bar button {
   background: var(--bg3);
   border: none;
@@ -187,21 +188,15 @@ input:disabled { opacity: 0.45; }
 .bar button.on { background: var(--accent2); color: #06231f; }
 
 .hint {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1d2026ee;
-  border: 1px solid #0009;
+  flex: 0 0 auto;
+  background: var(--bg2);
+  border-bottom: 1px solid #0008;
   color: var(--fg);
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.45;
-  padding: 8px 14px;
-  border-radius: 10px;
-  z-index: 10;
-  max-width: min(560px, calc(100% - 20px));
+  padding: 7px 12px;
   text-align: center;
-  pointer-events: none;
+  min-height: 2.2em;
 }
 .hint b { color: var(--accent2); }
 
@@ -209,9 +204,9 @@ input:disabled { opacity: 0.45; }
 .panel {
   position: absolute;
   right: 8px;
-  bottom: calc(74px + env(safe-area-inset-bottom));
+  bottom: 8px;
   top: auto;
-  max-height: min(70vh, 560px);
+  max-height: calc(100% - 16px);
   width: min(320px, calc(100% - 16px));
   overflow-y: auto;
   background: #1d2026f5;

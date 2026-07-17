@@ -48,9 +48,9 @@
 
   <!-- Hoekpunten aanwijzen -->
   <section id="scr-corners" class="screen full" hidden>
-    <canvas id="corner-canvas"></canvas>
     <div class="hint" id="corner-hint">Sleep de vier hoekpunten precies naar de hoeken van het vlak.</div>
-    <div class="bar bottom">
+    <div class="canvas-wrap"><canvas id="corner-canvas"></canvas></div>
+    <div class="bar main">
       <button id="btn-detect">🔍 Detecteer</button>
       <button id="btn-corners-reset">Reset</button>
       <button id="btn-corners-next" class="primary">Verder →</button>
@@ -83,15 +83,52 @@
 
   <!-- Overlay-weergave -->
   <section id="scr-overlay" class="screen full" hidden>
-    <canvas id="view-canvas"></canvas>
     <div class="hint" id="view-hint"></div>
+    <div class="canvas-wrap">
+      <canvas id="view-canvas"></canvas>
+      <div id="panel" class="panel" hidden>
+        <h3>Overlay</h3>
+        <label class="row">Dekking <input id="set-opacity" type="range" min="0" max="1" step="0.01"></label>
+        <label class="row">Weergave schets
+          <select id="set-sketchmode">
+            <option value="original">Origineel</option>
+            <option value="lines">Alleen lijnen</option>
+          </select>
+        </label>
+        <label class="row">Lijnkleur <input id="set-linecolor" type="color" value="#ff3b30"></label>
+        <label class="row">Mengmodus
+          <select id="set-blend">
+            <option value="normal">Normaal</option>
+            <option value="difference">Verschil</option>
+          </select>
+        </label>
+        <label class="row chk"><input id="set-gray" type="checkbox"> Referentie in grijswaarden</label>
+        <h3>Flikkeren</h3>
+        <label class="row chk"><input id="set-flicker" type="checkbox"> Flikkeren</label>
+        <label class="row">Snelheid <input id="set-flickerms" type="range" min="150" max="1500" step="50"></label>
+        <h3>Hulpmiddelen</h3>
+        <label class="row chk"><input id="set-grid" type="checkbox"> Raster</label>
+        <label class="row">Rastergrootte <input id="set-gridsize" type="range" min="1" max="10" step="0.5"></label>
+        <div class="row btns">
+          <button id="btn-guide-h">＋ Horizontaal</button>
+          <button id="btn-guide-v">＋ Verticaal</button>
+          <button id="btn-guides-clear">Wis hulplijnen</button>
+        </div>
+        <h3>Schets</h3>
+        <label class="row">Versie <select id="set-version"></select></label>
+        <div class="row btns">
+          <button id="btn-new-sketch">＋ Nieuwe schetsfoto</button>
+          <button id="btn-view-reset">Beeld passend</button>
+        </div>
+      </div>
+    </div>
 
-    <div class="bar above" id="align-tools" hidden>
+    <div class="bar tools" id="align-tools" hidden>
       <button id="btn-align-redo">Opnieuw</button>
       <button id="btn-align-apply" class="primary" disabled>✓ Toepassen</button>
     </div>
 
-    <div class="bar above" id="move-tools" hidden>
+    <div class="bar tools" id="move-tools" hidden>
       <button data-nudge="rotl" title="Draai linksom">⟲</button>
       <button data-nudge="rotr" title="Draai rechtsom">⟳</button>
       <button data-nudge="smaller" title="Verklein">−</button>
@@ -99,7 +136,7 @@
       <button id="btn-align-reset">Reset uitlijning</button>
     </div>
 
-    <div class="bar bottom" id="mode-bar">
+    <div class="bar main" id="mode-bar">
       <button data-mode="pan" class="mode active" title="Bekijken (verschuiven/zoomen)">🖐</button>
       <button data-mode="move" class="mode" title="Schets verplaatsen">✥</button>
       <button data-mode="align" class="mode" title="Uitlijnen met 2 ankerpunten">⚓</button>
@@ -107,42 +144,6 @@
       <span class="sep"></span>
       <button id="btn-flicker" title="Flikkeren aan/uit">⚡</button>
       <button id="btn-panel" title="Instellingen">⚙️</button>
-    </div>
-
-    <div id="panel" class="panel" hidden>
-      <h3>Overlay</h3>
-      <label class="row">Dekking <input id="set-opacity" type="range" min="0" max="1" step="0.01"></label>
-      <label class="row">Weergave schets
-        <select id="set-sketchmode">
-          <option value="original">Origineel</option>
-          <option value="lines">Alleen lijnen</option>
-        </select>
-      </label>
-      <label class="row">Lijnkleur <input id="set-linecolor" type="color" value="#ff3b30"></label>
-      <label class="row">Mengmodus
-        <select id="set-blend">
-          <option value="normal">Normaal</option>
-          <option value="difference">Verschil</option>
-        </select>
-      </label>
-      <label class="row chk"><input id="set-gray" type="checkbox"> Referentie in grijswaarden</label>
-      <h3>Flikkeren</h3>
-      <label class="row chk"><input id="set-flicker" type="checkbox"> Flikkeren</label>
-      <label class="row">Snelheid <input id="set-flickerms" type="range" min="150" max="1500" step="50"></label>
-      <h3>Hulpmiddelen</h3>
-      <label class="row chk"><input id="set-grid" type="checkbox"> Raster</label>
-      <label class="row">Rastergrootte <input id="set-gridsize" type="range" min="1" max="10" step="0.5"></label>
-      <div class="row btns">
-        <button id="btn-guide-h">＋ Horizontaal</button>
-        <button id="btn-guide-v">＋ Verticaal</button>
-        <button id="btn-guides-clear">Wis hulplijnen</button>
-      </div>
-      <h3>Schets</h3>
-      <label class="row">Versie <select id="set-version"></select></label>
-      <div class="row btns">
-        <button id="btn-new-sketch">＋ Nieuwe schetsfoto</button>
-        <button id="btn-view-reset">Beeld passend</button>
-      </div>
     </div>
   </section>
 
