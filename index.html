@@ -103,7 +103,18 @@
             <option value="difference">Verschil</option>
           </select>
         </label>
-        <label class="row chk"><input id="set-gray" type="checkbox"> Referentie in grijswaarden</label>
+        <h3>Weergave referentie</h3>
+        <label class="row">Modus
+          <select id="set-refmode">
+            <option value="color">Kleur</option>
+            <option value="gray">Grijswaarden</option>
+            <option value="values">Waarden (block-in)</option>
+            <option value="notan">Notan</option>
+          </select>
+        </label>
+        <label class="row" id="row-levels" hidden>Aantal waarden <input id="set-levels" type="range" min="2" max="8" step="1"><span class="out" id="levels-out"></span></label>
+        <label class="row" id="row-threshold" hidden>Drempel <input id="set-threshold" type="range" min="16" max="240" step="1"></label>
+        <label class="row" id="row-blur" hidden>Vervaging <input id="set-blur" type="range" min="0" max="12" step="1"></label>
         <h3>Flikkeren</h3>
         <label class="row chk"><input id="set-flicker" type="checkbox"> Flikkeren</label>
         <label class="row">Snelheid <input id="set-flickerms" type="range" min="150" max="1500" step="50"></label>

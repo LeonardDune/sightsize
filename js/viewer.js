@@ -75,10 +75,21 @@ function viewFit() {
 }
 
 /* ---------- afgeleide beelden (lui berekend) ---------- */
-function refGray() {
+function refView() {
   const it = refItem();
-  if (!it.gray) it.gray = toGrayscale(it.canvas);
-  return it.gray;
+  const st = settings();
+  if (st.refMode === 'color') return it.canvas;
+  const key = `${st.refMode}|${st.refLevels}|${st.refThreshold}|${st.refBlur}`;
+  if (!it.derived || it.derived.key !== key) {
+    it.derived = {
+      key,
+      canvas: reduceValues(it.canvas, {
+        mode: st.refMode, levels: st.refLevels,
+        threshold: st.refThreshold, blur: st.refBlur,
+      }),
+    };
+  }
+  return it.derived.canvas;
 }
 
 function sketchLines(it) {
@@ -124,7 +135,7 @@ function renderScene() {
   // referentie
   const ref = refItem();
   ctx.globalAlpha = ov === 'sketch' ? 0.25 : 1;
-  ctx.drawImage(st.gray ? refGray() : ref.canvas, 0, 0);
+  ctx.drawImage(refView(), 0, 0);
   ctx.globalAlpha = 1;
 
   // schets
@@ -535,11 +546,24 @@ function syncPanel() {
   $('#set-sketchmode').value = st.sketchMode;
   $('#set-linecolor').value = st.lineColor;
   $('#set-blend').value = st.blend;
-  $('#set-gray').checked = st.gray;
+  $('#set-refmode').value = st.refMode;
+  $('#set-levels').value = st.refLevels;
+  $('#set-threshold').value = st.refThreshold;
+  $('#set-blur').value = st.refBlur;
   $('#set-flicker').checked = st.flicker;
   $('#set-flickerms').value = st.flickerMs;
   $('#set-grid').checked = st.grid;
   $('#set-gridsize').value = st.gridCm;
+  updateRefRows();
+}
+
+// sliders alleen tonen bij de weergave waar ze bij horen
+function updateRefRows() {
+  const mode = settings().refMode;
+  $('#row-levels').hidden = mode !== 'values';
+  $('#row-threshold').hidden = mode !== 'notan';
+  $('#row-blur').hidden = mode !== 'values' && mode !== 'notan';
+  $('#levels-out').textContent = settings().refLevels;
 }
 
 function updateVersionSelect() {
@@ -593,7 +617,10 @@ function wireOverlay() {
   bind('#set-sketchmode', 'change', e => { settings().sketchMode = e.target.value; requestRender(); });
   bind('#set-linecolor', 'change', e => { settings().lineColor = e.target.value; requestRender(); });
   bind('#set-blend', 'change', e => { settings().blend = e.target.value; requestRender(); });
-  bind('#set-gray', 'change', e => { settings().gray = e.target.checked; requestRender(); });
+  bind('#set-refmode', 'change', e => { settings().refMode = e.target.value; updateRefRows(); requestRender(); });
+  bind('#set-levels', 'input', e => { settings().refLevels = +e.target.value; updateRefRows(); requestRender(); });
+  bind('#set-threshold', 'input', e => { settings().refThreshold = +e.target.value; requestRender(); });
+  bind('#set-blur', 'input', e => { settings().refBlur = +e.target.value; requestRender(); });
   bind('#set-flicker', 'change', e => { settings().flicker = e.target.checked; applyFlicker(); });
   bind('#set-flickerms', 'input', e => { settings().flickerMs = +e.target.value; applyFlicker(); });
   bind('#set-grid', 'change', e => { settings().grid = e.target.checked; requestRender(); });

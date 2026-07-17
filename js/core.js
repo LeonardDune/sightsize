@@ -388,21 +388,65 @@ function extractLines(srcCv, color = '#ff3b30') {
   return out;
 }
 
-/* ---------- grijswaarden ---------- */
-function toGrayscale(srcCv) {
+/* ---------- waardenreductie: grijswaarden, block-in (posterize), notan ----------
+   Separabele box-blur met lopende som; twee iteraties benaderen een
+   gaussische vervaging. Blur vóór de reductie voorkomt dat elk detail
+   zijn eigen vlekje wordt — pas dan zie je de grote vormen.             */
+function boxBlurGray(g, w, h, radius, iterations = 2) {
+  const r = Math.round(radius);
+  if (r < 1) return g;
+  const tmp = new Float32Array(w * h);
+  const n = 2 * r + 1;
+  for (let it = 0; it < iterations; it++) {
+    // horizontaal g → tmp
+    for (let y = 0; y < h; y++) {
+      const row = y * w;
+      let sum = 0;
+      for (let x = -r; x <= r; x++) sum += g[row + clamp(x, 0, w - 1)];
+      for (let x = 0; x < w; x++) {
+        tmp[row + x] = sum / n;
+        sum += g[row + clamp(x + r + 1, 0, w - 1)] - g[row + clamp(x - r, 0, w - 1)];
+      }
+    }
+    // verticaal tmp → g
+    for (let x = 0; x < w; x++) {
+      let sum = 0;
+      for (let y = -r; y <= r; y++) sum += tmp[clamp(y, 0, h - 1) * w + x];
+      for (let y = 0; y < h; y++) {
+        g[y * w + x] = sum / n;
+        sum += tmp[clamp(y + r + 1, 0, h - 1) * w + x] - tmp[clamp(y - r, 0, h - 1) * w + x];
+      }
+    }
+  }
+  return g;
+}
+
+// mode: 'gray' | 'values' (posterize naar `levels` niveaus) | 'notan' (drempel)
+function reduceValues(srcCv, { mode, levels = 4, threshold = 128, blur = 0 }) {
   const w = srcCv.width, h = srcCv.height;
+  const d = srcCv.getContext('2d').getImageData(0, 0, w, h).data;
+  let g = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  }
+  if (blur > 0 && mode !== 'gray') g = boxBlurGray(g, w, h, blur);
   const out = document.createElement('canvas');
   out.width = w;
   out.height = h;
   const octx = out.getContext('2d');
-  octx.drawImage(srcCv, 0, 0);
-  const id = octx.getImageData(0, 0, w, h);
-  const d = id.data;
+  const od = octx.createImageData(w, h);
+  const o = od.data;
   for (let i = 0; i < w * h; i++) {
-    const v = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
-    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
+    let v = g[i];
+    if (mode === 'values') {
+      v = Math.round((v / 255) * (levels - 1)) / (levels - 1) * 255;
+    } else if (mode === 'notan') {
+      v = v < threshold ? 0 : 255;
+    }
+    o[i * 4] = o[i * 4 + 1] = o[i * 4 + 2] = v;
+    o[i * 4 + 3] = d[i * 4 + 3];
   }
-  octx.putImageData(id, 0, 0);
+  octx.putImageData(od, 0, 0);
   return out;
 }
 

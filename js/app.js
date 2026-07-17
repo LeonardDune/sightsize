@@ -70,7 +70,8 @@ const App = {
 function defaultSettings() {
   return {
     opacity: 0.55, sketchMode: 'original', blend: 'normal', lineColor: '#ff3b30',
-    gray: false, flicker: false, flickerMs: 600, grid: false, gridCm: 5,
+    refMode: 'color', refLevels: 4, refThreshold: 128, refBlur: 2,
+    flicker: false, flickerMs: 600, grid: false, gridCm: 5,
   };
 }
 
@@ -328,7 +329,7 @@ async function processPending() {
     const canvas = buildOutputCanvas(p.type, p.srcCanvas, p.corners, p.dims);
     const item = {
       blob: p.blob, type: p.type, corners: p.corners, dims: p.dims,
-      canvas, gray: null, lines: null,
+      canvas, derived: null, lines: null,
     };
     if (p.target === 'ref') {
       App.session.ref = item;
@@ -360,7 +361,7 @@ async function unpackItem(pk) {
   const canvas = buildOutputCanvas(pk.type, srcCanvas, pk.corners, pk.dims);
   return {
     blob: pk.blob, type: pk.type, corners: pk.corners, dims: pk.dims,
-    canvas, gray: null, lines: null,
+    canvas, derived: null, lines: null,
     transform: pk.transform || null, label: pk.label || null,
   };
 }
@@ -399,9 +400,11 @@ async function openSession(id) {
   try {
     const rec = await Store.get(id);
     if (!rec) { toast('Sessie niet gevonden'); return; }
+    const settings = { ...defaultSettings(), ...rec.settings };
+    if (rec.settings && rec.settings.gray && !rec.settings.refMode) settings.refMode = 'gray';
     const s = {
       id: rec.id, name: rec.name,
-      settings: { ...defaultSettings(), ...rec.settings },
+      settings,
       guides: rec.guides || [],
       active: rec.active || 0,
       ref: await unpackItem(rec.ref),
