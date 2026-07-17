@@ -14,6 +14,7 @@ const V = {
   flickerHidden: false,
   measure: { stage: 0, refPts: [], skPts: [], result: null },
   align: { stage: 0, pts: [] },
+  dragKind: null, // 'ref' of 'sketch' tijdens het verslepen van een meet-/ankerpunt
   raf: 0,
 };
 
@@ -94,8 +95,9 @@ function requestRender() {
   V.raf = requestAnimationFrame(() => { V.raf = 0; renderScene(); });
 }
 
-// tijdens uitlijnen/meten wisselt de zichtbaarheid zodat je het juiste beeld aantikt
+// tijdens uitlijnen/meten wisselt de zichtbaarheid zodat je het juiste beeld ziet
 function visibilityOverride() {
+  if (V.dragKind) return V.dragKind;
   if (V.mode === 'align' && V.align.stage < 4) {
     return V.align.stage % 2 === 0 ? 'ref' : 'sketch';
   }
@@ -239,10 +241,12 @@ function updateHint() {
   let html = '';
   if (V.mode === 'pan') html = 'Sleep om te verschuiven, knijp of scroll om te zoomen. Hulplijnen kun je verslepen.';
   else if (V.mode === 'move') html = 'Sleep de <b>schets</b> om te verschuiven; knijp met twee vingers om te schalen en roteren.';
-  else if (V.mode === 'align') html = alignMsgs[Math.min(V.align.stage, 3)];
-  else if (V.mode === 'measure') {
+  else if (V.mode === 'align') {
+    html = V.align.stage < 4 ? alignMsgs[V.align.stage]
+      : 'Sleep ankerpunten om bij te stellen en tik <b>✓ Toepassen</b>.';
+  } else if (V.mode === 'measure') {
     html = V.measure.stage < 4 ? measureMsgs[V.measure.stage]
-      : `${V.measure.result} — tik om opnieuw te meten.`;
+      : `${V.measure.result} — sleep een punt om bij te stellen, tik elders om opnieuw te meten.`;
   }
   el.innerHTML = html;
 }
@@ -252,13 +256,30 @@ function setMode(mode) {
   V.mode = mode;
   V.measure = { stage: 0, refPts: [], skPts: [], result: null };
   V.align = { stage: 0, pts: [] };
+  V.dragKind = null;
   $$('#mode-bar .mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
   $('#move-tools').hidden = mode !== 'move';
+  $('#align-tools').hidden = mode !== 'align';
+  $('#btn-align-apply').disabled = true;
   updateHint();
   requestRender();
 }
 
 /* ---------- tikacties (meten / uitlijnen) ---------- */
+function updateMeasureResult() {
+  const m = V.measure;
+  if (m.refPts.length < 2 || m.skPts.length < 2) { m.result = null; return; }
+  const lenRef = dist(m.refPts[0], m.refPts[1]);
+  const lenSk = dist(m.skPts[0], m.skPts[1]);
+  const pct = lenRef > 1e-6 ? ((lenSk - lenRef) / lenRef) * 100 : 0;
+  const dims = refItem().dims;
+  const toStr = dims
+    ? (px) => `${fmt(px * dims.w / refItem().canvas.width)} cm`
+    : (px) => `${fmt(px, 0)} px`;
+  const sign = pct >= 0 ? '+' : '';
+  m.result = `Referentie ${toStr(lenRef)} · schets ${toStr(lenSk)} · afwijking ${sign}${fmt(pct)}%`;
+}
+
 function handleTap(world) {
   if (V.mode === 'measure') {
     const m = V.measure;
@@ -270,47 +291,58 @@ function handleTap(world) {
     }
     (m.stage < 2 ? m.refPts : m.skPts).push(world);
     m.stage++;
-    if (m.stage === 4) {
-      const lenRef = dist(m.refPts[0], m.refPts[1]);
-      const lenSk = dist(m.skPts[0], m.skPts[1]);
-      const pct = lenRef > 1e-6 ? ((lenSk - lenRef) / lenRef) * 100 : 0;
-      const dims = refItem().dims;
-      const toStr = dims
-        ? (px) => `${fmt(px * dims.w / refItem().canvas.width)} cm`
-        : (px) => `${fmt(px, 0)} px`;
-      const sign = pct >= 0 ? '+' : '';
-      V.measure.result = `Referentie ${toStr(lenRef)} · schets ${toStr(lenSk)} · afwijking ${sign}${fmt(pct)}%`;
-    }
+    if (m.stage === 4) updateMeasureResult();
     updateHint();
     requestRender();
   } else if (V.mode === 'align') {
     const a = V.align;
     if (a.stage >= 4) return;
-    if (a.stage % 2 === 0) {
-      a.pts.push({ world, kind: 'ref' });
-    } else {
-      // het aangetikte punt is de huidige wereldpositie van het schetsdetail;
-      // bewaar het in schetscoördinaten zodat we een nieuwe transform kunnen oplossen
-      const local = applySim(invertSim(activeSketch().transform), world);
-      a.pts.push({ world, local, kind: 'sk' });
-    }
+    a.pts.push({ world, kind: a.stage % 2 === 0 ? 'ref' : 'sk' });
     a.stage++;
-    if (a.stage === 4) {
-      const refPts = a.pts.filter(p => p.kind === 'ref').map(p => p.world);
-      const skPts = a.pts.filter(p => p.kind === 'sk').map(p => p.local);
-      const T = similarityFrom2(skPts[0], skPts[1], refPts[0], refPts[1]);
-      if (T) {
-        activeSketch().transform = T;
-        toast('Schets uitgelijnd ✓');
-      } else {
-        toast('Punten liggen te dicht bij elkaar');
-      }
-      setMode('pan');
-      return;
-    }
+    $('#btn-align-apply').disabled = a.stage < 4;
     updateHint();
     requestRender();
   }
+}
+
+// de aangetikte schetspunten zijn wereldposities van schetsdetails; pas bij het
+// toepassen worden ze via de huidige transform naar schetscoördinaten vertaald
+function applyAlign() {
+  const a = V.align;
+  if (a.stage < 4) return;
+  const refPts = a.pts.filter(p => p.kind === 'ref').map(p => p.world);
+  const inv = invertSim(activeSketch().transform);
+  const skPts = a.pts.filter(p => p.kind === 'sk').map(p => applySim(inv, p.world));
+  const T = similarityFrom2(skPts[0], skPts[1], refPts[0], refPts[1]);
+  if (T) {
+    activeSketch().transform = T;
+    toast('Schets uitgelijnd ✓');
+    setMode('pan');
+  } else {
+    toast('Punten liggen te dicht bij elkaar');
+  }
+}
+
+/* ---------- gezette meet-/ankerpunten oppakken om bij te stellen ---------- */
+function hitAdjustPoint(p) {
+  const grab = 18;
+  if (V.mode === 'measure') {
+    const m = V.measure;
+    for (const [list, kind] of [[m.refPts, 'ref'], [m.skPts, 'sketch']]) {
+      for (let i = 0; i < list.length; i++) {
+        if (dist(worldToScreen(list[i]), p) < grab) {
+          return { kind, set: (w) => { list[i] = w; updateMeasureResult(); } };
+        }
+      }
+    }
+  } else if (V.mode === 'align') {
+    for (const pt of V.align.pts) {
+      if (dist(worldToScreen(pt.world), p) < grab) {
+        return { kind: pt.kind === 'sk' ? 'sketch' : 'ref', set: (w) => { pt.world = w; } };
+      }
+    }
+  }
+  return null;
 }
 
 /* ---------- hulplijnen ---------- */
@@ -339,8 +371,10 @@ function onPointerDown(e) {
   const p = eventPos(e);
   V.pointers.set(e.pointerId, p);
   if (V.pointers.size === 1) {
-    V.gesture = { type: 'single', start: p, last: p, moved: false, guide: null };
+    V.gesture = { type: 'single', start: p, last: p, moved: false, guide: null, adjust: null };
     if (V.mode === 'pan') V.gesture.guide = hitGuide(p);
+    V.gesture.adjust = hitAdjustPoint(p);
+    if (V.gesture.adjust) { V.dragKind = V.gesture.adjust.kind; requestRender(); }
   } else if (V.pointers.size === 2) {
     const ids = [...V.pointers.keys()];
     V.gesture = {
@@ -365,7 +399,10 @@ function onPointerMove(e) {
   if (g.type === 'single' && V.pointers.size === 1) {
     const dx = p.x - prev.x, dy = p.y - prev.y;
     if (dist(p, g.start) > 6) g.moved = true;
-    if (g.guide != null) {
+    if (g.adjust) {
+      g.adjust.set(screenToWorld(p));
+      updateHint();
+    } else if (g.guide != null) {
       const guide = session().guides[g.guide];
       if (guide) guide.pos += (guide.type === 'h' ? dy : dx) / V.view.s;
     } else if (V.mode === 'move') {
@@ -408,8 +445,11 @@ function onPointerUp(e) {
   const g = V.gesture;
   V.pointers.delete(e.pointerId);
 
+  V.dragKind = null;
   if (g && g.type === 'single' && V.pointers.size === 0) {
-    if (g.guide != null) {
+    if (g.adjust) {
+      // punt is bijgesteld; geen tik-actie
+    } else if (g.guide != null) {
       // hulplijn buiten het referentievlak gesleept → verwijderen
       const guide = session().guides[g.guide];
       const ref = refItem().canvas;
@@ -534,6 +574,8 @@ function wireOverlay() {
     sk.transform = fitTransform(sk.canvas, refItem().canvas);
     requestRender();
   });
+  $('#btn-align-apply').addEventListener('click', applyAlign);
+  $('#btn-align-redo').addEventListener('click', () => setMode('align'));
 
   const bind = (id, ev, fn) => $(id).addEventListener(ev, fn);
   bind('#set-opacity', 'input', e => { settings().opacity = +e.target.value; requestRender(); });
