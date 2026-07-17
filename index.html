@@ -115,6 +115,16 @@
         <label class="row" id="row-levels" hidden>Aantal waarden <input id="set-levels" type="range" min="2" max="8" step="1"><span class="out" id="levels-out"></span></label>
         <label class="row" id="row-threshold" hidden>Drempel <input id="set-threshold" type="range" min="16" max="240" step="1"></label>
         <label class="row" id="row-blur" hidden>Vervaging <input id="set-blur" type="range" min="0" max="12" step="1"></label>
+        <h3>Blockin-lijnen</h3>
+        <label class="row">Modus
+          <select id="set-blockin">
+            <option value="off">Uit</option>
+            <option value="values">Waardenlijnen</option>
+            <option value="contours">Contourlijnen</option>
+            <option value="both">Beide</option>
+          </select>
+        </label>
+        <label class="row" id="row-blockin-detail" hidden>Detail <input id="set-blockindetail" type="range" min="1" max="10" step="1"></label>
         <h3>Flikkeren</h3>
         <label class="row chk"><input id="set-flicker" type="checkbox"> Flikkeren</label>
         <label class="row">Snelheid <input id="set-flickerms" type="range" min="150" max="1500" step="50"></label>

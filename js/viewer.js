@@ -100,6 +100,25 @@ function sketchLines(it) {
   return it.lines.canvas;
 }
 
+function blockinLines() {
+  const it = refItem();
+  const st = settings();
+  if (st.blockinMode === 'off') return null;
+  const key = `${st.blockinMode}|${st.blockinDetail}|${st.refLevels}|${st.refBlur}`;
+  if (!it.blockin || it.blockin.key !== key) {
+    it.blockin = {
+      key,
+      values: st.blockinMode !== 'contours'
+        ? blockinValueLines(it.canvas, { levels: st.refLevels, blur: st.refBlur, detail: st.blockinDetail })
+        : [],
+      contours: st.blockinMode !== 'values'
+        ? blockinContourLines(it.canvas, { detail: st.blockinDetail })
+        : [],
+    };
+  }
+  return it.blockin;
+}
+
 /* ---------- renderen ---------- */
 function requestRender() {
   if (V.raf) return;
@@ -151,6 +170,26 @@ function renderScene() {
     const T = sk.transform;
     ctx.transform(T.a, T.b, -T.b, T.a, T.tx, T.ty);
     ctx.drawImage(st.sketchMode === 'lines' ? sketchLines(sk) : sk.canvas, 0, 0);
+    ctx.restore();
+  }
+
+  // blockin-lijnen over de referentie
+  const bl = blockinLines();
+  if (bl && ov !== 'sketch') {
+    ctx.save();
+    ctx.lineWidth = 2 / V.view.s;
+    ctx.lineJoin = 'round';
+    const drawPolys = (polys, color) => {
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      for (const poly of polys) {
+        ctx.moveTo(poly[0].x, poly[0].y);
+        for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+      }
+      ctx.stroke();
+    };
+    drawPolys(bl.values, '#ff9f1a');
+    drawPolys(bl.contours, '#38bdf8');
     ctx.restore();
   }
 
@@ -550,6 +589,8 @@ function syncPanel() {
   $('#set-levels').value = st.refLevels;
   $('#set-threshold').value = st.refThreshold;
   $('#set-blur').value = st.refBlur;
+  $('#set-blockin').value = st.blockinMode;
+  $('#set-blockindetail').value = st.blockinDetail;
   $('#set-flicker').checked = st.flicker;
   $('#set-flickerms').value = st.flickerMs;
   $('#set-grid').checked = st.grid;
@@ -564,6 +605,7 @@ function updateRefRows() {
   $('#row-threshold').hidden = mode !== 'notan';
   $('#row-blur').hidden = mode !== 'values' && mode !== 'notan';
   $('#levels-out').textContent = settings().refLevels;
+  $('#row-blockin-detail').hidden = settings().blockinMode === 'off';
 }
 
 function updateVersionSelect() {
@@ -621,6 +663,8 @@ function wireOverlay() {
   bind('#set-levels', 'input', e => { settings().refLevels = +e.target.value; updateRefRows(); requestRender(); });
   bind('#set-threshold', 'input', e => { settings().refThreshold = +e.target.value; requestRender(); });
   bind('#set-blur', 'input', e => { settings().refBlur = +e.target.value; requestRender(); });
+  bind('#set-blockin', 'change', e => { settings().blockinMode = e.target.value; updateRefRows(); requestRender(); });
+  bind('#set-blockindetail', 'input', e => { settings().blockinDetail = +e.target.value; requestRender(); });
   bind('#set-flicker', 'change', e => { settings().flicker = e.target.checked; applyFlicker(); });
   bind('#set-flickerms', 'input', e => { settings().flickerMs = +e.target.value; applyFlicker(); });
   bind('#set-grid', 'change', e => { settings().grid = e.target.checked; requestRender(); });

@@ -71,6 +71,7 @@ function defaultSettings() {
   return {
     opacity: 0.55, sketchMode: 'original', blend: 'normal', lineColor: '#ff3b30',
     refMode: 'color', refLevels: 4, refThreshold: 128, refBlur: 2,
+    blockinMode: 'off', blockinDetail: 5,
     flicker: false, flickerMs: 600, grid: false, gridCm: 5,
   };
 }

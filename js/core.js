@@ -450,6 +450,162 @@ function reduceValues(srcCv, { mode, levels = 4, threshold = 128, blur = 0 }) {
   return out;
 }
 
+/* ---------- blockin-lijnen: randen → kettingen → rechte segmenten ---------- */
+function downscaledGray(srcCv, maxW = 640) {
+  const s = Math.min(1, maxW / srcCv.width);
+  const w = Math.max(2, Math.round(srcCv.width * s));
+  const h = Math.max(2, Math.round(srcCv.height * s));
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(srcCv, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  }
+  return { g, w, h, s };
+}
+
+// Ramer–Douglas–Peucker: polylijn vereenvoudigen tot rechte segmenten
+function rdpSimplify(pts, eps) {
+  if (pts.length < 3) return pts.slice();
+  const keep = new Uint8Array(pts.length);
+  keep[0] = keep[pts.length - 1] = 1;
+  const stack = [[0, pts.length - 1]];
+  const eps2 = eps * eps;
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    const A = pts[a], B = pts[b];
+    const dx = B.x - A.x, dy = B.y - A.y;
+    const len2 = dx * dx + dy * dy || 1;
+    let maxD = -1, idx = -1;
+    for (let i = a + 1; i < b; i++) {
+      const t = clamp(((pts[i].x - A.x) * dx + (pts[i].y - A.y) * dy) / len2, 0, 1);
+      const ex = A.x + t * dx - pts[i].x, ey = A.y + t * dy - pts[i].y;
+      const d = ex * ex + ey * ey;
+      if (d > maxD) { maxD = d; idx = i; }
+    }
+    if (idx >= 0 && maxD > eps2) {
+      keep[idx] = 1;
+      stack.push([a, idx], [idx, b]);
+    }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
+
+// verbindt 8-verbonden randpixels tot polylijnen; start bij eindpunten
+function chainEdgePixels(edge, w, h, minLen) {
+  const visited = new Uint8Array(w * h);
+  const polys = [];
+  const nb = [-1, 1, -w, w, -w - 1, -w + 1, w - 1, w + 1];
+  const valid = (i, j) => j >= 0 && j < w * h && Math.abs((j % w) - (i % w)) <= 1;
+  const degree = (i) => {
+    let n = 0;
+    for (const d of nb) { const j = i + d; if (valid(i, j) && edge[j] && !visited[j]) n++; }
+    return n;
+  };
+  const walk = (start) => {
+    const pts = [];
+    let cur = start;
+    while (cur >= 0) {
+      visited[cur] = 1;
+      pts.push({ x: cur % w, y: (cur / w) | 0 });
+      let next = -1, bestDeg = Infinity;
+      for (const d of nb) {
+        const j = cur + d;
+        if (!valid(cur, j) || visited[j] || !edge[j]) continue;
+        const dg = degree(j);
+        if (dg < bestDeg) { bestDeg = dg; next = j; }
+      }
+      cur = next;
+    }
+    return pts;
+  };
+  // eerst open uiteinden (graad ≤ 1), daarna resterende lussen
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < w * h; i++) {
+      if (!edge[i] || visited[i]) continue;
+      if (pass === 0 && degree(i) > 1) continue;
+      const pts = walk(i);
+      if (pts.length >= minLen) polys.push(pts);
+    }
+  }
+  return polys;
+}
+
+function finishPolys(polys, s, eps) {
+  return polys
+    .map(poly => rdpSimplify(poly, eps).map(p => ({ x: p.x / s, y: p.y / s })))
+    .filter(poly => poly.length >= 2);
+}
+
+// variant 1: rechte lijnen langs de grenzen van de waardevlakken
+function blockinValueLines(srcCv, { levels = 4, blur = 2, detail = 5 }) {
+  const { g, w, h, s } = downscaledGray(srcCv);
+  boxBlurGray(g, w, h, Math.max(2, blur), 2);
+  const L = Math.max(2, levels);
+  const q = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) q[i] = Math.round((g[i] / 255) * (L - 1));
+  const edge = new Uint8Array(w * h);
+  for (let y = 0; y < h - 1; y++) {
+    for (let x = 0; x < w - 1; x++) {
+      const i = y * w + x;
+      if (q[i] !== q[i + 1] || q[i] !== q[i + w]) edge[i] = 1;
+    }
+  }
+  const eps = Math.max(2, 13 - detail);
+  const minLen = Math.max(6, 26 - detail * 2);
+  return finishPolys(chainEdgePixels(edge, w, h, minLen), s, eps);
+}
+
+// variant 2: rechte lijnen langs de contouren van het beeld zelf
+// (Sobel-gradiënt, non-maximum suppression, drempel op percentiel)
+function blockinContourLines(srcCv, { detail = 5 }) {
+  const { g, w, h, s } = downscaledGray(srcCv);
+  boxBlurGray(g, w, h, 2, 2);
+  const mag = new Float32Array(w * h);
+  const bin = new Uint8Array(w * h);
+  let maxMag = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const gx = -g[i - w - 1] - 2 * g[i - 1] - g[i + w - 1] + g[i - w + 1] + 2 * g[i + 1] + g[i + w + 1];
+      const gy = -g[i - w - 1] - 2 * g[i - w] - g[i - w + 1] + g[i + w - 1] + 2 * g[i + w] + g[i + w + 1];
+      const m = Math.hypot(gx, gy);
+      mag[i] = m;
+      if (m > maxMag) maxMag = m;
+      const deg = ((Math.atan2(gy, gx) * 180) / Math.PI + 180) % 180;
+      bin[i] = (deg < 22.5 || deg >= 157.5) ? 0 : deg < 67.5 ? 1 : deg < 112.5 ? 2 : 3;
+    }
+  }
+  // drempel op percentiel van de niet-lege gradiënten
+  const hist = new Float64Array(256);
+  let count = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (mag[i] > 1) { hist[Math.min(255, (mag[i] / maxMag * 255) | 0)]++; count++; }
+  }
+  const pct = 0.985 - detail * 0.012;
+  let acc = 0, thr = maxMag * 0.2;
+  for (let b = 0; b < 256; b++) {
+    acc += hist[b];
+    if (acc >= count * pct) { thr = (b / 255) * maxMag; break; }
+  }
+  const offs = [1, w + 1, w, w - 1];
+  const edge = new Uint8Array(w * h);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const o = offs[bin[i]];
+      if (mag[i] > thr && mag[i] >= mag[i - o] && mag[i] >= mag[i + o]) edge[i] = 1;
+    }
+  }
+  const eps = Math.max(2, 12 - detail);
+  const minLen = Math.max(8, 30 - detail * 2);
+  return finishPolys(chainEdgePixels(edge, w, h, minLen), s, eps);
+}
+
 /* ---------- IndexedDB-opslag ---------- */
 const Store = {
   _db: null,
