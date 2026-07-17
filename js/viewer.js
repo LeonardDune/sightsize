@@ -323,26 +323,37 @@ function applyAlign() {
   }
 }
 
-/* ---------- gezette meet-/ankerpunten oppakken om bij te stellen ---------- */
+/* ---------- gezette meet-/ankerpunten oppakken om bij te stellen ----------
+   Tijdens het plaatsen zijn alleen punten van de reeks die je nu zet
+   oppakbaar; zo kan een schetspunt vlak naast een referentiepunt gezet
+   worden. Bij overlappende punten wint het dichtstbijzijnde.              */
 function hitAdjustPoint(p) {
   const grab = 18;
+  const cands = [];
   if (V.mode === 'measure') {
     const m = V.measure;
-    for (const [list, kind] of [[m.refPts, 'ref'], [m.skPts, 'sketch']]) {
-      for (let i = 0; i < list.length; i++) {
-        if (dist(worldToScreen(list[i]), p) < grab) {
-          return { kind, set: (w) => { list[i] = w; updateMeasureResult(); } };
-        }
-      }
+    const lists = m.stage >= 4 ? [[m.refPts, 'ref'], [m.skPts, 'sketch']]
+      : m.stage < 2 ? [[m.refPts, 'ref']] : [[m.skPts, 'sketch']];
+    for (const [list, kind] of lists) {
+      list.forEach((pt, i) => cands.push({
+        d: dist(worldToScreen(pt), p), kind,
+        set: (w) => { list[i] = w; updateMeasureResult(); },
+      }));
     }
   } else if (V.mode === 'align') {
-    for (const pt of V.align.pts) {
-      if (dist(worldToScreen(pt.world), p) < grab) {
-        return { kind: pt.kind === 'sk' ? 'sketch' : 'ref', set: (w) => { pt.world = w; } };
-      }
+    const a = V.align;
+    const curKind = a.stage >= 4 ? null : (a.stage % 2 === 0 ? 'ref' : 'sk');
+    for (const pt of a.pts) {
+      if (curKind && pt.kind !== curKind) continue;
+      cands.push({
+        d: dist(worldToScreen(pt.world), p),
+        kind: pt.kind === 'sk' ? 'sketch' : 'ref',
+        set: (w) => { pt.world = w; },
+      });
     }
   }
-  return null;
+  cands.sort((a, b) => a.d - b.d);
+  return cands.length && cands[0].d < grab ? cands[0] : null;
 }
 
 /* ---------- hulplijnen ---------- */
