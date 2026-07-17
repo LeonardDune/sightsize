@@ -104,6 +104,7 @@ button { font-family: inherit; }
 .session-list .meta .date { color: var(--muted); font-size: 12.5px; }
 .session-list button { background: var(--bg3); border: none; color: var(--fg); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; }
 .session-list button.open { background: var(--accent); color: #06121f; font-weight: 600; }
+.version { margin-top: 28px; font-size: 12px; text-align: center; opacity: 0.7; }
 
 /* ---- bronkeuze ---- */
 .choice-cards { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 20px; }
