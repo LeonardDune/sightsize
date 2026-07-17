@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#14161a">
+<title>SightSize — blockin-check</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header id="hdr">
+  <button id="btn-back" class="icon-btn" hidden>←</button>
+  <h1 id="hdr-title">SightSize</h1>
+  <button id="btn-save" class="icon-btn" hidden title="Sessie opslaan">💾 Opslaan</button>
+</header>
+
+<main>
+
+  <!-- Startscherm -->
+  <section id="scr-start" class="screen">
+    <p class="intro">Controleer hoe nauwkeurig je blockin-schets is ten opzichte van je referentie, op sight-size schaal. Upload een referentie en een foto van je schets, en vergelijk ze als overlay.</p>
+    <button id="btn-new" class="primary big">＋ Nieuwe sessie</button>
+    <h2>Opgeslagen sessies</h2>
+    <ul id="session-list" class="session-list"></ul>
+    <p id="no-sessions" class="muted">Nog geen opgeslagen sessies.</p>
+  </section>
+
+  <!-- Bronkeuze (referentie of schets) -->
+  <section id="scr-source" class="screen" hidden>
+    <h2 id="source-title"></h2>
+    <p id="source-sub" class="muted"></p>
+    <div class="choice-cards">
+      <label class="card">
+        <input type="radio" name="srctype" value="digital">
+        <span class="card-title" id="lbl-digital"></span>
+        <span class="card-sub" id="sub-digital"></span>
+      </label>
+      <label class="card">
+        <input type="radio" name="srctype" value="photo">
+        <span class="card-title" id="lbl-photo"></span>
+        <span class="card-sub" id="sub-photo"></span>
+      </label>
+    </div>
+    <label class="file-btn">📷 Kies afbeelding<input id="file-input" type="file" accept="image/*" hidden></label>
+  </section>
+
+  <!-- Hoekpunten aanwijzen -->
+  <section id="scr-corners" class="screen full" hidden>
+    <canvas id="corner-canvas"></canvas>
+    <div class="hint" id="corner-hint">Sleep de vier hoekpunten precies naar de hoeken van het vlak.</div>
+    <div class="bar bottom">
+      <button id="btn-detect">🔍 Detecteer</button>
+      <button id="btn-corners-reset">Reset</button>
+      <button id="btn-corners-next" class="primary">Verder →</button>
+    </div>
+  </section>
+
+  <!-- Formaat -->
+  <section id="scr-dims" class="screen" hidden>
+    <h2 id="dims-title">Formaat</h2>
+    <p class="muted" id="dims-sub"></p>
+    <label>Voorinstelling
+      <select id="dims-preset">
+        <option value="">Onbekend / overslaan</option>
+        <option value="14.8x21">A5 (14,8 × 21 cm)</option>
+        <option value="21x29.7">A4 (21 × 29,7 cm)</option>
+        <option value="29.7x42">A3 (29,7 × 42 cm)</option>
+        <option value="24x30">24 × 30 cm</option>
+        <option value="30x40">30 × 40 cm</option>
+        <option value="40x50">40 × 50 cm</option>
+        <option value="50x65">50 × 65 cm</option>
+        <option value="custom">Aangepast…</option>
+      </select>
+    </label>
+    <div class="dims-inputs">
+      <label>Breedte (cm)<input id="dims-w" type="number" min="0.1" step="0.1" disabled></label>
+      <label>Hoogte (cm)<input id="dims-h" type="number" min="0.1" step="0.1" disabled></label>
+    </div>
+    <button id="btn-dims-next" class="primary big">Verder →</button>
+  </section>
+
+  <!-- Overlay-weergave -->
+  <section id="scr-overlay" class="screen full" hidden>
+    <canvas id="view-canvas"></canvas>
+    <div class="hint" id="view-hint"></div>
+
+    <div class="bar above" id="move-tools" hidden>
+      <button data-nudge="rotl" title="Draai linksom">⟲</button>
+      <button data-nudge="rotr" title="Draai rechtsom">⟳</button>
+      <button data-nudge="smaller" title="Verklein">−</button>
+      <button data-nudge="bigger" title="Vergroot">＋</button>
+      <button id="btn-align-reset">Reset uitlijning</button>
+    </div>
+
+    <div class="bar bottom" id="mode-bar">
+      <button data-mode="pan" class="mode active" title="Bekijken (verschuiven/zoomen)">🖐</button>
+      <button data-mode="move" class="mode" title="Schets verplaatsen">✥</button>
+      <button data-mode="align" class="mode" title="Uitlijnen met 2 ankerpunten">⚓</button>
+      <button data-mode="measure" class="mode" title="Meten en vergelijken">📏</button>
+      <span class="sep"></span>
+      <button id="btn-flicker" title="Flikkeren aan/uit">⚡</button>
+      <button id="btn-panel" title="Instellingen">⚙️</button>
+    </div>
+
+    <div id="panel" class="panel" hidden>
+      <h3>Overlay</h3>
+      <label class="row">Dekking <input id="set-opacity" type="range" min="0" max="1" step="0.01"></label>
+      <label class="row">Weergave schets
+        <select id="set-sketchmode">
+          <option value="original">Origineel</option>
+          <option value="lines">Alleen lijnen</option>
+        </select>
+      </label>
+      <label class="row">Lijnkleur <input id="set-linecolor" type="color" value="#ff3b30"></label>
+      <label class="row">Mengmodus
+        <select id="set-blend">
+          <option value="normal">Normaal</option>
+          <option value="difference">Verschil</option>
+        </select>
+      </label>
+      <label class="row chk"><input id="set-gray" type="checkbox"> Referentie in grijswaarden</label>
+      <h3>Flikkeren</h3>
+      <label class="row chk"><input id="set-flicker" type="checkbox"> Flikkeren</label>
+      <label class="row">Snelheid <input id="set-flickerms" type="range" min="150" max="1500" step="50"></label>
+      <h3>Hulpmiddelen</h3>
+      <label class="row chk"><input id="set-grid" type="checkbox"> Raster</label>
+      <label class="row">Rastergrootte <input id="set-gridsize" type="range" min="1" max="10" step="0.5"></label>
+      <div class="row btns">
+        <button id="btn-guide-h">＋ Horizontaal</button>
+        <button id="btn-guide-v">＋ Verticaal</button>
+        <button id="btn-guides-clear">Wis hulplijnen</button>
+      </div>
+      <h3>Schets</h3>
+      <label class="row">Versie <select id="set-version"></select></label>
+      <div class="row btns">
+        <button id="btn-new-sketch">＋ Nieuwe schetsfoto</button>
+        <button id="btn-view-reset">Beeld passend</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="spinner" hidden><div class="spin"></div><p id="spinner-msg"></p></div>
+<div id="toast" hidden></div>
+
+<script src="js/core.js"></script>
+<script src="js/viewer.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
