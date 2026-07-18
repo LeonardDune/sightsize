@@ -190,6 +190,27 @@ input:disabled { opacity: 0.45; }
 .bar input[type="color"] { width: 40px; height: 36px; padding: 0; border: none; background: none; cursor: pointer; }
 .bar input[type="range"] { width: 90px; accent-color: var(--accent); }
 
+.sample-card { font-size: 12.5px; line-height: 1.4; max-width: min(480px, calc(100% - 16px)); }
+.sample-card .sw {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 2px solid #ffffff44;
+  flex: 0 0 auto;
+}
+.sample-card #sample-info { text-align: left; font-variant-numeric: tabular-nums; }
+
+.palette-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 13px; }
+.palette-row button {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 2px solid #ffffff33;
+  cursor: pointer;
+  padding: 0;
+}
+.palette-row button.hi { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
 .hint {
   flex: 0 0 auto;
   background: var(--bg2);

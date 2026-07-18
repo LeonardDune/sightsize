@@ -456,6 +456,143 @@ function reduceValues(srcCv, { mode, levels = 4, threshold = 128, blur = 0 }) {
   return out;
 }
 
+/* ---------- kleurruimtes ---------- */
+function srgbToLinear(c) {
+  c /= 255;
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+function rgbToLab(r, g, b) {
+  const R = srgbToLinear(r), G = srgbToLinear(g), B = srgbToLinear(b);
+  const X = (0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047;
+  const Y = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+  const Z = (0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883;
+  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const fx = f(X), fy = f(Y), fz = f(Z);
+  return { L: 116 * fy - 16, a: 500 * (fx - fy), b: 200 * (fy - fz) };
+}
+
+// waardenstap op een 9-staps schaal: 1 = donkerst, 9 = lichtst
+function valueStep(r, g, b) {
+  return clamp(1 + Math.round(rgbToLab(r, g, b).L / 100 * 8), 1, 9);
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('');
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return { h: h * 360, s, l };
+}
+
+/* ---------- kleur sampelen: gemiddelde over een cirkelgebied ---------- */
+function averageArea(canvas, cx, cy, rad) {
+  const x0 = Math.floor(cx - rad), y0 = Math.floor(cy - rad);
+  const x1 = Math.ceil(cx + rad), y1 = Math.ceil(cy + rad);
+  const rx0 = clamp(x0, 0, canvas.width - 1), ry0 = clamp(y0, 0, canvas.height - 1);
+  const rw = clamp(x1, 0, canvas.width) - rx0, rh = clamp(y1, 0, canvas.height) - ry0;
+  if (rw < 1 || rh < 1) return null;
+  const d = canvas.getContext('2d').getImageData(rx0, ry0, rw, rh).data;
+  let r = 0, g = 0, b = 0, n = 0;
+  const r2 = rad * rad;
+  for (let y = 0; y < rh; y++) {
+    for (let x = 0; x < rw; x++) {
+      const dx = rx0 + x + 0.5 - cx, dy = ry0 + y + 0.5 - cy;
+      if (dx * dx + dy * dy > r2) continue;
+      const i = (y * rw + x) * 4;
+      if (d[i + 3] < 128) continue;
+      r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+    }
+  }
+  if (!n) return null;
+  return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
+}
+
+/* ---------- dominante kleuren via k-means in Lab ----------
+   Deterministische init (verste-punt), dus stabiel over runs.  */
+function dominantColors(srcCv, k = 6) {
+  const maxW = 160;
+  const s = Math.min(1, maxW / srcCv.width);
+  const w = Math.max(2, Math.round(srcCv.width * s));
+  const h = Math.max(2, Math.round(srcCv.height * s));
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(srcCv, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const pts = [], idxMap = [];
+  for (let i = 0; i < w * h; i++) {
+    if (d[i * 4 + 3] < 128) continue;
+    pts.push({ lab: rgbToLab(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]), r: d[i * 4], g: d[i * 4 + 1], b: d[i * 4 + 2] });
+    idxMap.push(i);
+  }
+  if (!pts.length) return { colors: [], assign: new Int16Array(w * h).fill(-1), w, h };
+  k = Math.min(k, pts.length);
+  const dist2 = (a, b) => (a.L - b.L) ** 2 + (a.a - b.a) ** 2 + (a.b - b.b) ** 2;
+
+  // init: eerste punt, daarna telkens het punt dat het verst van alle centra ligt
+  const centers = [{ ...pts[0].lab }];
+  const minD = new Float64Array(pts.length).fill(Infinity);
+  while (centers.length < k) {
+    let far = 0, farD = -1;
+    for (let i = 0; i < pts.length; i++) {
+      minD[i] = Math.min(minD[i], dist2(pts[i].lab, centers[centers.length - 1]));
+      if (minD[i] > farD) { farD = minD[i]; far = i; }
+    }
+    centers.push({ ...pts[far].lab });
+  }
+
+  const asg = new Int16Array(pts.length);
+  for (let it = 0; it < 14; it++) {
+    for (let i = 0; i < pts.length; i++) {
+      let best = 0, bestD = Infinity;
+      for (let c = 0; c < centers.length; c++) {
+        const dd = dist2(pts[i].lab, centers[c]);
+        if (dd < bestD) { bestD = dd; best = c; }
+      }
+      asg[i] = best;
+    }
+    const acc = centers.map(() => ({ L: 0, a: 0, b: 0, n: 0 }));
+    for (let i = 0; i < pts.length; i++) {
+      const a = acc[asg[i]];
+      a.L += pts[i].lab.L; a.a += pts[i].lab.a; a.b += pts[i].lab.b; a.n++;
+    }
+    for (let c = 0; c < centers.length; c++) {
+      if (acc[c].n) centers[c] = { L: acc[c].L / acc[c].n, a: acc[c].a / acc[c].n, b: acc[c].b / acc[c].n };
+    }
+  }
+
+  // gemiddelde RGB per cluster + aandeel
+  const rgb = centers.map(() => ({ r: 0, g: 0, b: 0, n: 0 }));
+  for (let i = 0; i < pts.length; i++) {
+    const a = rgb[asg[i]];
+    a.r += pts[i].r; a.g += pts[i].g; a.b += pts[i].b; a.n++;
+  }
+  const order = [];
+  const assign = new Int16Array(w * h).fill(-1);
+  const colors = [];
+  rgb.forEach((a, c) => {
+    if (!a.n) return;
+    const r = Math.round(a.r / a.n), g = Math.round(a.g / a.n), b = Math.round(a.b / a.n);
+    colors.push({ r, g, b, hex: rgbToHex(r, g, b), share: a.n / pts.length, L: rgbToLab(r, g, b).L, step: valueStep(r, g, b), _c: c });
+  });
+  colors.sort((x, y) => y.L - x.L); // licht → donker
+  colors.forEach((col, i) => { order[col._c] = i; delete col._c; });
+  for (let i = 0; i < pts.length; i++) assign[idxMap[i]] = order[asg[i]];
+  return { colors, assign, w, h };
+}
+
 /* ---------- blockin-lijnen: randen → kettingen → rechte segmenten ---------- */
 function downscaledGray(srcCv, maxW = 640) {
   const s = Math.min(1, maxW / srcCv.width);

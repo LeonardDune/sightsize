@@ -16,6 +16,9 @@ const V = {
   align: { stage: 0, pts: [] },
   dragKind: null, // 'ref' of 'sketch' tijdens het verslepen van een meet-/ankerpunt
   draw: { erase: false, cur: null }, // tekenmodus: gum aan/uit en lijn-in-wording
+  sample: null,   // laatste pipet-meting {world, ref:{r,g,b}, sk:{r,g,b}|null}
+  selNote: -1,    // geselecteerde kleurnotitie in pipet-modus
+  palette: null,  // {colors, assign, w, h, hi, hiCanvas, hiIdx}
   raf: 0,
 };
 
@@ -45,6 +48,8 @@ function enterOverlay() {
   syncPanel();
   updateVersionSelect();
   updateDrawVersionSelect();
+  V.palette = null;
+  renderPaletteRow();
   setMode('pan');
   applyFlicker();
   requestRender();
@@ -180,6 +185,12 @@ function renderScene() {
     ctx.restore();
   }
 
+  // palet-highlight: dim alles buiten de gekozen kleurcluster
+  const pc = paletteHighlightCanvas();
+  if (pc && ov !== 'sketch') {
+    ctx.drawImage(pc, 0, 0, ref.canvas.width, ref.canvas.height);
+  }
+
   // blockin-lijnen over de referentie
   const bl = blockinLines();
   if (bl && ov !== 'sketch') {
@@ -204,6 +215,33 @@ function renderScene() {
   if (st.showDrawing && ov !== 'sketch') {
     drawStrokes(ctx, session().drawing.strokes);
     if (V.draw.cur) drawStrokes(ctx, [V.draw.cur]);
+  }
+
+  // kleurnotities (vastgepinde stalen)
+  if (st.showNotes && ov !== 'sketch') {
+    const rr = 9 / V.view.s;
+    session().notes.forEach((n, i) => {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, rr, 0, Math.PI * 2);
+      ctx.fillStyle = rgbToHex(n.r, n.g, n.b);
+      ctx.fill();
+      ctx.lineWidth = (i === V.selNote ? 3 : 1.5) / V.view.s;
+      ctx.strokeStyle = i === V.selNote ? '#4da3ff' : '#ffffff';
+      ctx.stroke();
+    });
+  }
+
+  // pipet-markering
+  if (V.mode === 'sample' && V.sample) {
+    ctx.beginPath();
+    ctx.arc(V.sample.world.x, V.sample.world.y, st.sampleRadius, 0, Math.PI * 2);
+    ctx.lineWidth = 1.5 / V.view.s;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(V.sample.world.x, V.sample.world.y, st.sampleRadius + 2 / V.view.s, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000aa';
+    ctx.stroke();
   }
 
   // raster
@@ -334,6 +372,8 @@ function updateHint() {
     html = V.draw.erase
       ? '<b>Gum</b> — tik of sleep over een lijn om die te wissen.'
       : 'Sleep een <b>rechte lijn</b> van punt naar punt; uiteinden klikken vast aan bestaande lijnen. Twee vingers pannen/zoomen.';
+  } else if (V.mode === 'sample') {
+    html = 'Tik om een <b>kleur te sampelen</b>; 📌 pint de kleur vast als notitie. Tik een notitie aan om die te bekijken.';
   }
   else if (V.mode === 'align') {
     html = V.align.stage < 4 ? alignMsgs[V.align.stage]
@@ -355,13 +395,124 @@ function setMode(mode) {
   $('#move-tools').hidden = mode !== 'move';
   $('#align-tools').hidden = mode !== 'align';
   $('#draw-tools').hidden = mode !== 'draw';
+  $('#sample-card').hidden = mode !== 'sample';
   $('#btn-align-apply').disabled = true;
+  V.sample = null;
+  V.selNote = -1;
+  if (mode === 'sample') updateSampleCard();
   if (mode === 'draw') {
     settings().showDrawing = true;
     $('#set-showdrawing').checked = true;
   }
   updateHint();
   requestRender();
+}
+
+/* ---------- pipet: kleur en waarde sampelen ---------- */
+function doSample(world) {
+  const st = settings();
+  const refC = averageArea(refItem().canvas, world.x, world.y, st.sampleRadius);
+  if (!refC) { V.sample = null; return; }
+  let skC = null;
+  const sk = activeSketch();
+  const T = sk.transform;
+  const local = applySim(invertSim(T), world);
+  const scale = Math.hypot(T.a, T.b) || 1;
+  skC = averageArea(sk.canvas, local.x, local.y, st.sampleRadius / scale);
+  V.sample = { world, ref: refC, sk: skC };
+}
+
+function sampleInfoHtml(c, skC) {
+  const lab = rgbToLab(c.r, c.g, c.b);
+  const hsl = rgbToHsl(c.r, c.g, c.b);
+  const step = valueStep(c.r, c.g, c.b);
+  let html = `<b>${rgbToHex(c.r, c.g, c.b)}</b> · waarde <b>${step}/9</b> (L* ${fmt(lab.L, 0)}) · ${fmt(hsl.h, 0)}° ${fmt(hsl.s * 100, 0)}%`;
+  if (skC) {
+    const skStep = valueStep(skC.r, skC.g, skC.b);
+    const d = skStep - step;
+    const rel = d === 0 ? 'gelijk' : `${Math.abs(d)} stap${Math.abs(d) === 1 ? '' : 'pen'} ${d > 0 ? 'lichter' : 'donkerder'}`;
+    html += `<br>schets: waarde ${skStep}/9 — ${rel}`;
+  }
+  return html;
+}
+
+function updateSampleCard() {
+  const swRef = $('#sw-ref'), swSk = $('#sw-sk'), info = $('#sample-info');
+  const pin = $('#btn-pin'), del = $('#btn-note-del');
+  swRef.hidden = swSk.hidden = pin.hidden = del.hidden = true;
+  if (V.selNote >= 0 && session().notes[V.selNote]) {
+    const n = session().notes[V.selNote];
+    swRef.hidden = false;
+    swRef.style.background = rgbToHex(n.r, n.g, n.b);
+    info.innerHTML = `Notitie · ${sampleInfoHtml(n, null)}`;
+    del.hidden = false;
+  } else if (V.sample && V.sample.ref) {
+    swRef.hidden = false;
+    swRef.style.background = rgbToHex(V.sample.ref.r, V.sample.ref.g, V.sample.ref.b);
+    if (V.sample.sk) {
+      swSk.hidden = false;
+      swSk.style.background = rgbToHex(V.sample.sk.r, V.sample.sk.g, V.sample.sk.b);
+    }
+    info.innerHTML = sampleInfoHtml(V.sample.ref, V.sample.sk);
+    pin.hidden = false;
+  } else {
+    info.textContent = 'Tik op de afbeelding om een kleur te sampelen.';
+  }
+}
+
+function hitNote(p) {
+  const notes = session().notes;
+  for (let i = notes.length - 1; i >= 0; i--) {
+    if (dist(worldToScreen(notes[i]), p) < 15) return i;
+  }
+  return -1;
+}
+
+/* ---------- kleurenschema (dominante kleuren) ---------- */
+function computePalette() {
+  V.palette = dominantColors(refItem().canvas, settings().paletteK);
+  V.palette.hi = -1;
+  V.palette.hiCanvas = null;
+  renderPaletteRow();
+  requestRender();
+}
+
+function renderPaletteRow() {
+  const row = $('#palette-row');
+  row.innerHTML = '';
+  if (!V.palette) return;
+  V.palette.colors.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.style.background = c.hex;
+    b.title = `${c.hex} · waarde ${c.step}/9 · ${fmt(c.share * 100, 0)}%`;
+    b.classList.toggle('hi', V.palette.hi === i);
+    b.addEventListener('click', () => {
+      V.palette.hi = V.palette.hi === i ? -1 : i;
+      toast(`${c.hex} · waarde ${c.step}/9 · aandeel ${fmt(c.share * 100, 0)}%`);
+      renderPaletteRow();
+      requestRender();
+    });
+    row.appendChild(b);
+  });
+}
+
+function paletteHighlightCanvas() {
+  const P = V.palette;
+  if (!P || P.hi < 0) return null;
+  if (!P.hiCanvas || P.hiIdx !== P.hi) {
+    const cv = document.createElement('canvas');
+    cv.width = P.w;
+    cv.height = P.h;
+    const ctx = cv.getContext('2d');
+    const id = ctx.createImageData(P.w, P.h);
+    for (let i = 0; i < P.w * P.h; i++) {
+      if (P.assign[i] !== P.hi) id.data[i * 4 + 3] = 175;
+    }
+    ctx.putImageData(id, 0, 0);
+    P.hiCanvas = cv;
+    P.hiIdx = P.hi;
+  }
+  return P.hiCanvas;
 }
 
 /* ---------- tekenen op de referentie (rechte lijnstukken) ---------- */
@@ -455,6 +606,17 @@ function handleTap(world) {
     a.stage++;
     $('#btn-align-apply').disabled = a.stage < 4;
     updateHint();
+    requestRender();
+  } else if (V.mode === 'sample') {
+    const ni = hitNote(worldToScreen(world));
+    if (ni >= 0) {
+      V.selNote = ni;
+      V.sample = null;
+    } else {
+      V.selNote = -1;
+      doSample(world);
+    }
+    updateSampleCard();
     requestRender();
   }
 }
@@ -653,7 +815,7 @@ function onPointerUp(e) {
           toast('Hulplijn verwijderd');
         }
       }
-    } else if (!g.moved && (V.mode === 'measure' || V.mode === 'align')) {
+    } else if (!g.moved && (V.mode === 'measure' || V.mode === 'align' || V.mode === 'sample')) {
       handleTap(screenToWorld(p));
     }
     V.gesture = null;
@@ -729,6 +891,10 @@ function syncPanel() {
   $('#set-blockindetail').value = st.blockinDetail;
   $('#set-drawcolor').value = st.drawColor;
   $('#set-drawwidth').value = st.drawWidth;
+  $('#set-samplerad').value = st.sampleRadius;
+  $('#set-palk').value = st.paletteK;
+  $('#palk-out').textContent = st.paletteK;
+  $('#set-shownotes').checked = st.showNotes;
   $('#set-flicker').checked = st.flicker;
   $('#set-flickerms').value = st.flickerMs;
   $('#set-grid').checked = st.grid;
@@ -822,6 +988,32 @@ function wireOverlay() {
     }
   });
   bind('#btn-drawversion-save', 'click', saveDrawingVersion);
+  bind('#set-samplerad', 'input', e => {
+    settings().sampleRadius = +e.target.value;
+    if (V.sample) { doSample(V.sample.world); updateSampleCard(); }
+    requestRender();
+  });
+  bind('#set-palk', 'input', e => {
+    settings().paletteK = +e.target.value;
+    $('#palk-out').textContent = e.target.value;
+  });
+  bind('#btn-palette', 'click', computePalette);
+  bind('#set-shownotes', 'change', e => { settings().showNotes = e.target.checked; requestRender(); });
+  bind('#btn-pin', 'click', () => {
+    if (!V.sample || !V.sample.ref) return;
+    session().notes.push({ x: V.sample.world.x, y: V.sample.world.y, ...V.sample.ref });
+    settings().showNotes = true;
+    $('#set-shownotes').checked = true;
+    toast('Kleurnotitie vastgepind ✓');
+    requestRender();
+  });
+  bind('#btn-note-del', 'click', () => {
+    if (V.selNote < 0) return;
+    session().notes.splice(V.selNote, 1);
+    V.selNote = -1;
+    updateSampleCard();
+    requestRender();
+  });
   bind('#set-drawversion', 'change', e => {
     if (e.target.value === '') return;
     const v = session().drawingVersions[+e.target.value];

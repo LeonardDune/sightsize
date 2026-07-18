@@ -74,6 +74,7 @@ function defaultSettings() {
     showRef: true, showSketch: true, showDrawing: true,
     blockinValues: false, blockinContours: false, blockinDetail: 5,
     drawColor: '#22c55e', drawWidth: 6,
+    sampleRadius: 8, paletteK: 6, showNotes: true,
     flicker: false, flickerMs: 600, grid: false, gridCm: 5,
   };
 }
@@ -89,6 +90,7 @@ function newSession() {
     guides: [],
     drawing: { strokes: [] },
     drawingVersions: [],
+    notes: [],
   };
   App.goSource('ref');
 }
@@ -388,7 +390,7 @@ async function saveSession() {
   const rec = {
     id: s.id, name: s.name, updated: Date.now(), thumb: t.toDataURL('image/jpeg', 0.7),
     settings: s.settings, guides: s.guides, active: s.active,
-    drawing: s.drawing, drawingVersions: s.drawingVersions,
+    drawing: s.drawing, drawingVersions: s.drawingVersions, notes: s.notes,
     ref: packItem(s.ref), sketches: s.sketches.map(packItem),
   };
   try {
@@ -420,6 +422,7 @@ async function openSession(id) {
       active: rec.active || 0,
       drawing: rec.drawing || { strokes: [] },
       drawingVersions: rec.drawingVersions || [],
+      notes: rec.notes || [],
       ref: await unpackItem(rec.ref),
       sketches: [],
     };

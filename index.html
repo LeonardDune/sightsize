@@ -117,6 +117,12 @@
         <label class="row" id="row-levels" hidden>Aantal waarden <input id="set-levels" type="range" min="2" max="8" step="1"><span class="out" id="levels-out"></span></label>
         <label class="row" id="row-threshold" hidden>Drempel <input id="set-threshold" type="range" min="16" max="240" step="1"></label>
         <label class="row" id="row-blur" hidden>Vervaging <input id="set-blur" type="range" min="0" max="12" step="1"></label>
+        <h3>Kleur</h3>
+        <label class="row">Pipetgrootte <input id="set-samplerad" type="range" min="2" max="30" step="1"></label>
+        <label class="row">Aantal kleuren <input id="set-palk" type="range" min="3" max="12" step="1"><span class="out" id="palk-out"></span></label>
+        <div class="row btns"><button id="btn-palette">🎨 Bepaal palet</button></div>
+        <div id="palette-row" class="palette-row"></div>
+        <label class="row chk"><input id="set-shownotes" type="checkbox"> Kleurnotities tonen</label>
         <h3>Blockin-lijnen (automatisch)</h3>
         <label class="row chk"><input id="set-blvalues" type="checkbox"> Waardenlijnen</label>
         <label class="row chk"><input id="set-blcontours" type="checkbox"> Contourlijnen</label>
@@ -162,6 +168,14 @@
       <button id="btn-align-reset">Reset uitlijning</button>
     </div>
 
+    <div class="bar tools sample-card" id="sample-card" hidden>
+      <span class="sw" id="sw-ref" hidden></span>
+      <span class="sw" id="sw-sk" hidden></span>
+      <span id="sample-info">Tik op de afbeelding om een kleur te sampelen.</span>
+      <button id="btn-pin" hidden title="Vastpinnen als kleurnotitie">📌</button>
+      <button id="btn-note-del" hidden title="Notitie verwijderen">🗑</button>
+    </div>
+
     <div class="bar tools" id="draw-tools" hidden>
       <input id="set-drawcolor" type="color" value="#22c55e" title="Lijnkleur">
       <input id="set-drawwidth" type="range" min="2" max="20" step="1" title="Lijndikte">
@@ -174,6 +188,7 @@
       <button data-mode="pan" class="mode active" title="Bekijken (verschuiven/zoomen)">🖐</button>
       <button data-mode="move" class="mode" title="Schets verplaatsen">✥</button>
       <button data-mode="draw" class="mode" title="Tekenen op de referentie">✏️</button>
+      <button data-mode="sample" class="mode" title="Kleur sampelen (pipet)">💧</button>
       <button data-mode="align" class="mode" title="Uitlijnen met 2 ankerpunten">⚓</button>
       <button data-mode="measure" class="mode" title="Meten en vergelijken">📏</button>
       <span class="sep"></span>
