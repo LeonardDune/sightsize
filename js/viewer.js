@@ -332,8 +332,8 @@ function updateHint() {
   else if (V.mode === 'move') html = 'Sleep de <b>schets</b> om te verschuiven; knijp met twee vingers om te schalen en roteren.';
   else if (V.mode === 'draw') {
     html = V.draw.erase
-      ? '<b>Gum</b> — tik of sleep over een lijn om die helemaal te wissen.'
-      : 'Teken met één vinger op de <b>referentie</b>; twee vingers pannen/zoomen.';
+      ? '<b>Gum</b> — tik of sleep over een lijn om die te wissen.'
+      : 'Sleep een <b>rechte lijn</b> van punt naar punt; uiteinden klikken vast aan bestaande lijnen. Twee vingers pannen/zoomen.';
   }
   else if (V.mode === 'align') {
     html = V.align.stage < 4 ? alignMsgs[V.align.stage]
@@ -364,7 +364,20 @@ function setMode(mode) {
   requestRender();
 }
 
-/* ---------- tekenen op de referentie ---------- */
+/* ---------- tekenen op de referentie (rechte lijnstukken) ---------- */
+// klik een uiteinde vast aan een bestaand lijnuiteinde binnen grijpafstand
+function snapToEndpoint(w) {
+  const tol = 12 / V.view.s;
+  let best = null, bestD = tol;
+  for (const s of session().drawing.strokes) {
+    for (const p of [s.pts[0], s.pts[s.pts.length - 1]]) {
+      const d = dist(p, w);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+  }
+  return best ? { x: best.x, y: best.y } : w;
+}
+
 function eraseAt(w) {
   const strokes = session().drawing.strokes;
   const tol = 10 / V.view.s;
@@ -530,8 +543,12 @@ function onPointerDown(e) {
     else if (V.mode === 'draw') {
       V.gesture.drawing = true;
       const w = screenToWorld(p);
-      if (V.draw.erase) eraseAt(w);
-      else V.draw.cur = { color: settings().drawColor, w: settings().drawWidth, pts: [w] };
+      if (V.draw.erase) {
+        eraseAt(w);
+      } else {
+        const start = snapToEndpoint(w);
+        V.draw.cur = { color: settings().drawColor, w: settings().drawWidth, pts: [start, start] };
+      }
       requestRender();
     }
   } else if (V.pointers.size === 2) {
@@ -568,8 +585,7 @@ function onPointerMove(e) {
       if (V.draw.erase) {
         eraseAt(w);
       } else if (V.draw.cur) {
-        const last = V.draw.cur.pts[V.draw.cur.pts.length - 1];
-        if (dist(w, last) > 1.5 / V.view.s) V.draw.cur.pts.push(w);
+        V.draw.cur.pts[1] = snapToEndpoint(w);
       }
     } else if (g.guide != null) {
       const guide = session().guides[g.guide];
@@ -616,8 +632,12 @@ function onPointerUp(e) {
 
   V.dragKind = null;
   if (V.draw.cur && V.pointers.size === 0) {
-    session().drawing.strokes.push(V.draw.cur);
+    // alleen een echt lijnstuk bewaren; een tikje zonder sleep vervalt
+    if (dist(V.draw.cur.pts[0], V.draw.cur.pts[1]) > 3 / V.view.s) {
+      session().drawing.strokes.push(V.draw.cur);
+    }
     V.draw.cur = null;
+    requestRender();
   }
   if (g && g.type === 'single' && V.pointers.size === 0) {
     if (g.adjust || g.drawing) {
