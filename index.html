@@ -88,7 +88,8 @@
     <div class="canvas-wrap">
       <canvas id="view-canvas"></canvas>
       <div id="panel" class="panel" hidden>
-        <h3>Overlay</h3>
+        <h3>Schets-overlay</h3>
+        <label class="row chk"><input id="set-showsketch" type="checkbox"> Tonen</label>
         <label class="row">Dekking <input id="set-opacity" type="range" min="0" max="1" step="0.01"></label>
         <label class="row">Weergave schets
           <select id="set-sketchmode">
@@ -103,7 +104,8 @@
             <option value="difference">Verschil</option>
           </select>
         </label>
-        <h3>Weergave referentie</h3>
+        <h3>Referentiefoto</h3>
+        <label class="row chk"><input id="set-showref" type="checkbox"> Tonen</label>
         <label class="row">Modus
           <select id="set-refmode">
             <option value="color">Kleur</option>
@@ -115,16 +117,18 @@
         <label class="row" id="row-levels" hidden>Aantal waarden <input id="set-levels" type="range" min="2" max="8" step="1"><span class="out" id="levels-out"></span></label>
         <label class="row" id="row-threshold" hidden>Drempel <input id="set-threshold" type="range" min="16" max="240" step="1"></label>
         <label class="row" id="row-blur" hidden>Vervaging <input id="set-blur" type="range" min="0" max="12" step="1"></label>
-        <h3>Blockin-lijnen</h3>
-        <label class="row">Modus
-          <select id="set-blockin">
-            <option value="off">Uit</option>
-            <option value="values">Waardenlijnen</option>
-            <option value="contours">Contourlijnen</option>
-            <option value="both">Beide</option>
-          </select>
-        </label>
+        <h3>Blockin-lijnen (automatisch)</h3>
+        <label class="row chk"><input id="set-blvalues" type="checkbox"> Waardenlijnen</label>
+        <label class="row chk"><input id="set-blcontours" type="checkbox"> Contourlijnen</label>
         <label class="row" id="row-blockin-detail" hidden>Detail <input id="set-blockindetail" type="range" min="1" max="10" step="1"></label>
+        <h3>Tekening (zelf getekend)</h3>
+        <label class="row chk"><input id="set-showdrawing" type="checkbox"> Tonen</label>
+        <label class="row">Versie laden
+          <select id="set-drawversion"><option value="">— kies —</option></select>
+        </label>
+        <div class="row btns">
+          <button id="btn-drawversion-save">💾 Opslaan als versie</button>
+        </div>
         <h3>Flikkeren</h3>
         <label class="row chk"><input id="set-flicker" type="checkbox"> Flikkeren</label>
         <label class="row">Snelheid <input id="set-flickerms" type="range" min="150" max="1500" step="50"></label>
@@ -158,9 +162,18 @@
       <button id="btn-align-reset">Reset uitlijning</button>
     </div>
 
+    <div class="bar tools" id="draw-tools" hidden>
+      <input id="set-drawcolor" type="color" value="#22c55e" title="Lijnkleur">
+      <input id="set-drawwidth" type="range" min="2" max="20" step="1" title="Lijndikte">
+      <button id="btn-eraser" title="Gum: wist hele lijnen">🧽</button>
+      <button id="btn-draw-undo" title="Laatste lijn ongedaan maken">↩</button>
+      <button id="btn-draw-clear" title="Hele tekening wissen">🗑</button>
+    </div>
+
     <div class="bar main" id="mode-bar">
       <button data-mode="pan" class="mode active" title="Bekijken (verschuiven/zoomen)">🖐</button>
       <button data-mode="move" class="mode" title="Schets verplaatsen">✥</button>
+      <button data-mode="draw" class="mode" title="Tekenen op de referentie">✏️</button>
       <button data-mode="align" class="mode" title="Uitlijnen met 2 ankerpunten">⚓</button>
       <button data-mode="measure" class="mode" title="Meten en vergelijken">📏</button>
       <span class="sep"></span>

@@ -7,6 +7,12 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function distToSeg(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy || 1;
+  const t = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / len2, 0, 1);
+  return Math.hypot(a.x + t * dx - p.x, a.y + t * dy - p.y);
+}
 function fmt(n, dec = 1) {
   return n.toLocaleString('nl-NL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }

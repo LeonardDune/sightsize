@@ -71,7 +71,9 @@ function defaultSettings() {
   return {
     opacity: 0.55, sketchMode: 'original', blend: 'normal', lineColor: '#ff3b30',
     refMode: 'color', refLevels: 4, refThreshold: 128, refBlur: 2,
-    blockinMode: 'off', blockinDetail: 5,
+    showRef: true, showSketch: true, showDrawing: true,
+    blockinValues: false, blockinContours: false, blockinDetail: 5,
+    drawColor: '#22c55e', drawWidth: 6,
     flicker: false, flickerMs: 600, grid: false, gridCm: 5,
   };
 }
@@ -85,6 +87,8 @@ function newSession() {
     active: 0,
     settings: defaultSettings(),
     guides: [],
+    drawing: { strokes: [] },
+    drawingVersions: [],
   };
   App.goSource('ref');
 }
@@ -384,6 +388,7 @@ async function saveSession() {
   const rec = {
     id: s.id, name: s.name, updated: Date.now(), thumb: t.toDataURL('image/jpeg', 0.7),
     settings: s.settings, guides: s.guides, active: s.active,
+    drawing: s.drawing, drawingVersions: s.drawingVersions,
     ref: packItem(s.ref), sketches: s.sketches.map(packItem),
   };
   try {
@@ -403,11 +408,18 @@ async function openSession(id) {
     if (!rec) { toast('Sessie niet gevonden'); return; }
     const settings = { ...defaultSettings(), ...rec.settings };
     if (rec.settings && rec.settings.gray && !rec.settings.refMode) settings.refMode = 'gray';
+    if (rec.settings && rec.settings.blockinMode) {
+      settings.blockinValues = ['values', 'both'].includes(rec.settings.blockinMode);
+      settings.blockinContours = ['contours', 'both'].includes(rec.settings.blockinMode);
+      delete settings.blockinMode;
+    }
     const s = {
       id: rec.id, name: rec.name,
       settings,
       guides: rec.guides || [],
       active: rec.active || 0,
+      drawing: rec.drawing || { strokes: [] },
+      drawingVersions: rec.drawingVersions || [],
       ref: await unpackItem(rec.ref),
       sketches: [],
     };

@@ -187,6 +187,8 @@ input:disabled { opacity: 0.45; }
 .bar button.mode.active { background: var(--accent); color: #06121f; }
 .bar .sep { width: 1px; align-self: stretch; background: #333945; margin: 0 2px; }
 .bar button.on { background: var(--accent2); color: #06231f; }
+.bar input[type="color"] { width: 40px; height: 36px; padding: 0; border: none; background: none; cursor: pointer; }
+.bar input[type="range"] { width: 90px; accent-color: var(--accent); }
 
 .hint {
   flex: 0 0 auto;

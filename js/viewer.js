@@ -15,6 +15,7 @@ const V = {
   measure: { stage: 0, refPts: [], skPts: [], result: null },
   align: { stage: 0, pts: [] },
   dragKind: null, // 'ref' of 'sketch' tijdens het verslepen van een meet-/ankerpunt
+  draw: { erase: false, cur: null }, // tekenmodus: gum aan/uit en lijn-in-wording
   raf: 0,
 };
 
@@ -43,6 +44,7 @@ function enterOverlay() {
   viewFit();
   syncPanel();
   updateVersionSelect();
+  updateDrawVersionSelect();
   setMode('pan');
   applyFlicker();
   requestRender();
@@ -103,15 +105,15 @@ function sketchLines(it) {
 function blockinLines() {
   const it = refItem();
   const st = settings();
-  if (st.blockinMode === 'off') return null;
-  const key = `${st.blockinMode}|${st.blockinDetail}|${st.refLevels}|${st.refBlur}`;
+  if (!st.blockinValues && !st.blockinContours) return null;
+  const key = `${st.blockinValues}|${st.blockinContours}|${st.blockinDetail}|${st.refLevels}|${st.refBlur}`;
   if (!it.blockin || it.blockin.key !== key) {
     it.blockin = {
       key,
-      values: st.blockinMode !== 'contours'
+      values: st.blockinValues
         ? blockinValueLines(it.canvas, { levels: st.refLevels, blur: st.refBlur, detail: st.blockinDetail })
         : [],
-      contours: st.blockinMode !== 'values'
+      contours: st.blockinContours
         ? blockinContourLines(it.canvas, { detail: st.blockinDetail })
         : [],
     };
@@ -151,15 +153,20 @@ function renderScene() {
   ctx.translate(V.view.tx, V.view.ty);
   ctx.scale(V.view.s, V.view.s);
 
-  // referentie
+  // referentie: foto, of leeg "papier" als de fotolaag uitstaat
   const ref = refItem();
   ctx.globalAlpha = ov === 'sketch' ? 0.25 : 1;
-  ctx.drawImage(refView(), 0, 0);
+  if (st.showRef) {
+    ctx.drawImage(refView(), 0, 0);
+  } else {
+    ctx.fillStyle = '#ece8dd';
+    ctx.fillRect(0, 0, ref.canvas.width, ref.canvas.height);
+  }
   ctx.globalAlpha = 1;
 
   // schets
   const sk = activeSketch();
-  let alpha = st.opacity;
+  let alpha = st.showSketch ? st.opacity : 0;
   if (ov === 'ref') alpha = 0;
   else if (ov === 'sketch') alpha = 1;
   if (V.flickerHidden && !ov) alpha = 0;
@@ -191,6 +198,12 @@ function renderScene() {
     drawPolys(bl.values, '#ff9f1a');
     drawPolys(bl.contours, '#38bdf8');
     ctx.restore();
+  }
+
+  // eigen tekening
+  if (st.showDrawing && ov !== 'sketch') {
+    drawStrokes(ctx, session().drawing.strokes);
+    if (V.draw.cur) drawStrokes(ctx, [V.draw.cur]);
   }
 
   // raster
@@ -244,6 +257,32 @@ function drawGrid(ctx, ref, st) {
   ctx.restore();
 }
 
+function drawStrokes(ctx, strokes) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const s of strokes) {
+    const p = s.pts;
+    if (p.length === 1) {
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.arc(p[0].x, p[0].y, s.w / 2, 0, Math.PI * 2);
+      ctx.fill();
+      continue;
+    }
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.w;
+    ctx.beginPath();
+    ctx.moveTo(p[0].x, p[0].y);
+    for (let i = 1; i < p.length - 1; i++) {
+      ctx.quadraticCurveTo(p[i].x, p[i].y, (p[i].x + p[i + 1].x) / 2, (p[i].y + p[i + 1].y) / 2);
+    }
+    ctx.lineTo(p[p.length - 1].x, p[p.length - 1].y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawMarkers(ctx, pts, color, lw) {
   ctx.save();
   ctx.lineWidth = lw * 1.4;
@@ -291,6 +330,11 @@ function updateHint() {
   let html = '';
   if (V.mode === 'pan') html = 'Sleep om te verschuiven, knijp of scroll om te zoomen. Hulplijnen kun je verslepen.';
   else if (V.mode === 'move') html = 'Sleep de <b>schets</b> om te verschuiven; knijp met twee vingers om te schalen en roteren.';
+  else if (V.mode === 'draw') {
+    html = V.draw.erase
+      ? '<b>Gum</b> — tik of sleep over een lijn om die helemaal te wissen.'
+      : 'Teken met één vinger op de <b>referentie</b>; twee vingers pannen/zoomen.';
+  }
   else if (V.mode === 'align') {
     html = V.align.stage < 4 ? alignMsgs[V.align.stage]
       : 'Sleep ankerpunten om bij te stellen en tik <b>✓ Toepassen</b>.';
@@ -310,9 +354,56 @@ function setMode(mode) {
   $$('#mode-bar .mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
   $('#move-tools').hidden = mode !== 'move';
   $('#align-tools').hidden = mode !== 'align';
+  $('#draw-tools').hidden = mode !== 'draw';
   $('#btn-align-apply').disabled = true;
+  if (mode === 'draw') {
+    settings().showDrawing = true;
+    $('#set-showdrawing').checked = true;
+  }
   updateHint();
   requestRender();
+}
+
+/* ---------- tekenen op de referentie ---------- */
+function eraseAt(w) {
+  const strokes = session().drawing.strokes;
+  const tol = 10 / V.view.s;
+  for (let i = strokes.length - 1; i >= 0; i--) {
+    const s = strokes[i];
+    const hit = s.pts.length === 1
+      ? dist(s.pts[0], w) < s.w / 2 + tol
+      : s.pts.some((p, j) => j > 0 && distToSeg(w, s.pts[j - 1], p) < s.w / 2 + tol);
+    if (hit) {
+      strokes.splice(i, 1);
+      requestRender();
+      return;
+    }
+  }
+}
+
+function saveDrawingVersion() {
+  const s = session();
+  if (!s.drawing.strokes.length) { toast('Nog geen tekening om op te slaan'); return; }
+  const name = prompt('Naam voor deze tekenversie:', `Tekening ${s.drawingVersions.length + 1}`);
+  if (name === null) return;
+  s.drawingVersions.push({
+    label: name.trim() || `Tekening ${s.drawingVersions.length + 1}`,
+    created: Date.now(),
+    strokes: JSON.parse(JSON.stringify(s.drawing.strokes)),
+  });
+  updateDrawVersionSelect();
+  toast('Tekenversie opgeslagen ✓');
+}
+
+function updateDrawVersionSelect() {
+  const sel = $('#set-drawversion');
+  sel.innerHTML = '<option value="">— kies —</option>';
+  session().drawingVersions.forEach((v, i) => {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = v.label;
+    sel.appendChild(o);
+  });
 }
 
 /* ---------- tikacties (meten / uitlijnen) ---------- */
@@ -432,11 +523,20 @@ function onPointerDown(e) {
   const p = eventPos(e);
   V.pointers.set(e.pointerId, p);
   if (V.pointers.size === 1) {
-    V.gesture = { type: 'single', start: p, last: p, moved: false, guide: null, adjust: null };
+    V.gesture = { type: 'single', start: p, last: p, moved: false, guide: null, adjust: null, drawing: false };
     if (V.mode === 'pan') V.gesture.guide = hitGuide(p);
     V.gesture.adjust = hitAdjustPoint(p);
     if (V.gesture.adjust) { V.dragKind = V.gesture.adjust.kind; requestRender(); }
+    else if (V.mode === 'draw') {
+      V.gesture.drawing = true;
+      const w = screenToWorld(p);
+      if (V.draw.erase) eraseAt(w);
+      else V.draw.cur = { color: settings().drawColor, w: settings().drawWidth, pts: [w] };
+      requestRender();
+    }
   } else if (V.pointers.size === 2) {
+    // tweede vinger: lijn-in-wording annuleren, gebaar wordt pannen/zoomen
+    V.draw.cur = null;
     const ids = [...V.pointers.keys()];
     V.gesture = {
       type: 'pinch',
@@ -463,6 +563,14 @@ function onPointerMove(e) {
     if (g.adjust) {
       g.adjust.set(screenToWorld(p));
       updateHint();
+    } else if (g.drawing) {
+      const w = screenToWorld(p);
+      if (V.draw.erase) {
+        eraseAt(w);
+      } else if (V.draw.cur) {
+        const last = V.draw.cur.pts[V.draw.cur.pts.length - 1];
+        if (dist(w, last) > 1.5 / V.view.s) V.draw.cur.pts.push(w);
+      }
     } else if (g.guide != null) {
       const guide = session().guides[g.guide];
       if (guide) guide.pos += (guide.type === 'h' ? dy : dx) / V.view.s;
@@ -507,9 +615,13 @@ function onPointerUp(e) {
   V.pointers.delete(e.pointerId);
 
   V.dragKind = null;
+  if (V.draw.cur && V.pointers.size === 0) {
+    session().drawing.strokes.push(V.draw.cur);
+    V.draw.cur = null;
+  }
   if (g && g.type === 'single' && V.pointers.size === 0) {
-    if (g.adjust) {
-      // punt is bijgesteld; geen tik-actie
+    if (g.adjust || g.drawing) {
+      // punt bijgesteld of lijn getekend; geen tik-actie
     } else if (g.guide != null) {
       // hulplijn buiten het referentievlak gesleept → verwijderen
       const guide = session().guides[g.guide];
@@ -589,8 +701,14 @@ function syncPanel() {
   $('#set-levels').value = st.refLevels;
   $('#set-threshold').value = st.refThreshold;
   $('#set-blur').value = st.refBlur;
-  $('#set-blockin').value = st.blockinMode;
+  $('#set-showref').checked = st.showRef;
+  $('#set-showsketch').checked = st.showSketch;
+  $('#set-showdrawing').checked = st.showDrawing;
+  $('#set-blvalues').checked = st.blockinValues;
+  $('#set-blcontours').checked = st.blockinContours;
   $('#set-blockindetail').value = st.blockinDetail;
+  $('#set-drawcolor').value = st.drawColor;
+  $('#set-drawwidth').value = st.drawWidth;
   $('#set-flicker').checked = st.flicker;
   $('#set-flickerms').value = st.flickerMs;
   $('#set-grid').checked = st.grid;
@@ -605,7 +723,7 @@ function updateRefRows() {
   $('#row-threshold').hidden = mode !== 'notan';
   $('#row-blur').hidden = mode !== 'values' && mode !== 'notan';
   $('#levels-out').textContent = settings().refLevels;
-  $('#row-blockin-detail').hidden = settings().blockinMode === 'off';
+  $('#row-blockin-detail').hidden = !settings().blockinValues && !settings().blockinContours;
 }
 
 function updateVersionSelect() {
@@ -663,8 +781,38 @@ function wireOverlay() {
   bind('#set-levels', 'input', e => { settings().refLevels = +e.target.value; updateRefRows(); requestRender(); });
   bind('#set-threshold', 'input', e => { settings().refThreshold = +e.target.value; requestRender(); });
   bind('#set-blur', 'input', e => { settings().refBlur = +e.target.value; requestRender(); });
-  bind('#set-blockin', 'change', e => { settings().blockinMode = e.target.value; updateRefRows(); requestRender(); });
+  bind('#set-showref', 'change', e => { settings().showRef = e.target.checked; requestRender(); });
+  bind('#set-showsketch', 'change', e => { settings().showSketch = e.target.checked; requestRender(); });
+  bind('#set-showdrawing', 'change', e => { settings().showDrawing = e.target.checked; requestRender(); });
+  bind('#set-blvalues', 'change', e => { settings().blockinValues = e.target.checked; updateRefRows(); requestRender(); });
+  bind('#set-blcontours', 'change', e => { settings().blockinContours = e.target.checked; updateRefRows(); requestRender(); });
   bind('#set-blockindetail', 'input', e => { settings().blockinDetail = +e.target.value; requestRender(); });
+  bind('#set-drawcolor', 'input', e => { settings().drawColor = e.target.value; });
+  bind('#set-drawwidth', 'input', e => { settings().drawWidth = +e.target.value; });
+  bind('#btn-eraser', 'click', () => {
+    V.draw.erase = !V.draw.erase;
+    $('#btn-eraser').classList.toggle('on', V.draw.erase);
+    updateHint();
+  });
+  bind('#btn-draw-undo', 'click', () => { session().drawing.strokes.pop(); requestRender(); });
+  bind('#btn-draw-clear', 'click', () => {
+    if (session().drawing.strokes.length && confirm('Hele tekening wissen?')) {
+      session().drawing.strokes = [];
+      requestRender();
+    }
+  });
+  bind('#btn-drawversion-save', 'click', saveDrawingVersion);
+  bind('#set-drawversion', 'change', e => {
+    if (e.target.value === '') return;
+    const v = session().drawingVersions[+e.target.value];
+    e.target.value = '';
+    if (!v) return;
+    session().drawing.strokes = JSON.parse(JSON.stringify(v.strokes));
+    settings().showDrawing = true;
+    $('#set-showdrawing').checked = true;
+    toast(`“${v.label}” geladen`);
+    requestRender();
+  });
   bind('#set-flicker', 'change', e => { settings().flicker = e.target.checked; applyFlicker(); });
   bind('#set-flickerms', 'input', e => { settings().flickerMs = +e.target.value; applyFlicker(); });
   bind('#set-grid', 'change', e => { settings().grid = e.target.checked; requestRender(); });
