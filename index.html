@@ -87,6 +87,14 @@
     <div class="hint" id="view-hint"></div>
     <div class="canvas-wrap">
       <canvas id="view-canvas"></canvas>
+      <div class="panel layer-panel" id="layer-panel" hidden>
+        <div class="layer-head">
+          <span>Tekenlagen</span>
+          <button id="btn-layer-add" title="Nieuwe laag">＋</button>
+        </div>
+        <div id="layer-list" class="layer-list"></div>
+      </div>
+
       <div id="panel" class="panel" hidden>
         <h3>Schets-overlay</h3>
         <label class="row chk"><input id="set-showsketch" type="checkbox"> Tonen</label>
@@ -198,9 +206,11 @@
     <div class="bar tools" id="draw-tools" hidden>
       <input id="set-drawcolor" type="color" value="#22c55e" title="Lijnkleur">
       <input id="set-drawwidth" type="range" min="2" max="20" step="1" title="Lijndikte">
+      <button id="btn-snap" title="Uiteinden aan elkaar klikken (snappen)">🧲</button>
+      <button id="btn-edit" title="Eindpunten aanpassen">🎯</button>
       <button id="btn-eraser" title="Gum: wist hele lijnen">🧽</button>
-      <button id="btn-draw-undo" title="Laatste lijn ongedaan maken">↩</button>
-      <button id="btn-draw-clear" title="Hele tekening wissen">🗑</button>
+      <button id="btn-draw-undo" title="Laatste lijn in laag ongedaan maken">↩</button>
+      <button id="btn-draw-clear" title="Actieve laag wissen">🗑</button>
     </div>
 
     <div class="bar main" id="mode-bar">

@@ -73,10 +73,24 @@ function defaultSettings() {
     refMode: 'color', refLevels: 4, refThreshold: 128, refBlur: 2,
     showRef: true, showSketch: true, showDrawing: true,
     blockinValues: false, blockinContours: false, blockinDetail: 5,
-    drawColor: '#22c55e', drawWidth: 6,
+    drawColor: '#22c55e', drawWidth: 6, drawSnap: true,
     sampleRadius: 8, paletteK: 6, showNotes: true, mixTarget: 'sample',
     flicker: false, flickerMs: 600, grid: false, gridCm: 5,
   };
+}
+
+function newDrawing() {
+  return { layers: [{ name: 'Laag 1', visible: true, strokes: [] }], active: 0 };
+}
+
+// oude platte { strokes } → lagenstructuur; nieuwe structuur blijft ongewijzigd
+function normalizeDrawing(d) {
+  if (!d) return newDrawing();
+  if (Array.isArray(d.layers) && d.layers.length) {
+    d.active = Math.min(Math.max(0, d.active | 0), d.layers.length - 1);
+    return d;
+  }
+  return { layers: [{ name: 'Laag 1', visible: true, strokes: d.strokes || [] }], active: 0 };
 }
 
 function newSession() {
@@ -88,7 +102,7 @@ function newSession() {
     active: 0,
     settings: defaultSettings(),
     guides: [],
-    drawing: { strokes: [] },
+    drawing: newDrawing(),
     drawingVersions: [],
     notes: [],
   };
@@ -420,8 +434,9 @@ async function openSession(id) {
       settings,
       guides: rec.guides || [],
       active: rec.active || 0,
-      drawing: rec.drawing || { strokes: [] },
-      drawingVersions: rec.drawingVersions || [],
+      drawing: normalizeDrawing(rec.drawing),
+      drawingVersions: (rec.drawingVersions || []).map(v =>
+        v.drawing ? v : { label: v.label, created: v.created, drawing: normalizeDrawing({ strokes: v.strokes }) }),
       notes: rec.notes || [],
       ref: await unpackItem(rec.ref),
       sketches: [],

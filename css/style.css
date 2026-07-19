@@ -229,6 +229,33 @@ input:disabled { opacity: 0.45; }
 .mix-item .recipe .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: middle; border: 1px solid #ffffff44; }
 .mix-item .de { color: var(--muted); font-variant-numeric: tabular-nums; }
 
+/* tekenlagen-paneel */
+.panel.layer-panel {
+  left: 8px;
+  right: auto;
+  top: 8px;
+  bottom: auto;
+  width: min(210px, calc(100% - 16px));
+  max-height: min(50vh, 340px);
+  padding: 10px;
+}
+.layer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.layer-head button { background: var(--bg3); border: none; color: var(--fg); border-radius: 7px; width: 28px; height: 28px; font-size: 16px; cursor: pointer; }
+.layer-list { display: flex; flex-direction: column; gap: 5px; }
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg3);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 5px 6px;
+}
+.layer-row.active { border-color: var(--accent); }
+.layer-row .vis, .layer-row .del { background: none; border: none; color: var(--fg); font-size: 15px; cursor: pointer; padding: 2px 4px; line-height: 1; }
+.layer-row .name { flex: 1; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.layer-row.active .name { font-weight: 600; }
+
 .hint {
   flex: 0 0 auto;
   background: var(--bg2);

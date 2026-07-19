@@ -15,7 +15,7 @@ const V = {
   measure: { stage: 0, refPts: [], skPts: [], result: null },
   align: { stage: 0, pts: [] },
   dragKind: null, // 'ref' of 'sketch' tijdens het verslepen van een meet-/ankerpunt
-  draw: { erase: false, cur: null }, // tekenmodus: gum aan/uit en lijn-in-wording
+  draw: { erase: false, edit: false, cur: null, editPt: null, editStroke: null }, // tekenmodus
   sample: null,   // laatste pipet-meting {world, ref:{r,g,b}, sk:{r,g,b}|null}
   selNote: -1,    // geselecteerde kleurnotitie in pipet-modus
   palette: null,  // {colors, assign, w, h, hi, hiCanvas, hiIdx}
@@ -51,7 +51,9 @@ function enterOverlay() {
   V.palette = null;
   renderPaletteRow();
   renderNotesRow();
+  renderLayerList();
   $('#mix-results').innerHTML = '';
+  $('#btn-snap').classList.toggle('on', settings().drawSnap);
   setMode('pan');
   applyFlicker();
   requestRender();
@@ -213,10 +215,13 @@ function renderScene() {
     ctx.restore();
   }
 
-  // eigen tekening
+  // eigen tekening: alle zichtbare lagen
   if (st.showDrawing && ov !== 'sketch') {
-    drawStrokes(ctx, session().drawing.strokes);
+    for (const layer of drawingLayers()) {
+      if (layer.visible) drawStrokes(ctx, layer.strokes);
+    }
     if (V.draw.cur) drawStrokes(ctx, [V.draw.cur]);
+    if (V.mode === 'draw') drawEndpointHandles(ctx);
   }
 
   // kleurnotities (vastgepinde stalen)
@@ -371,9 +376,9 @@ function updateHint() {
   if (V.mode === 'pan') html = 'Sleep om te verschuiven, knijp of scroll om te zoomen. Hulplijnen kun je verslepen.';
   else if (V.mode === 'move') html = 'Sleep de <b>schets</b> om te verschuiven; knijp met twee vingers om te schalen en roteren.';
   else if (V.mode === 'draw') {
-    html = V.draw.erase
-      ? '<b>Gum</b> — tik of sleep over een lijn om die te wissen.'
-      : 'Sleep een <b>rechte lijn</b> van punt naar punt; uiteinden klikken vast aan bestaande lijnen. Twee vingers pannen/zoomen.';
+    if (V.draw.erase) html = '<b>Gum</b> — tik of sleep over een lijn om die te wissen.';
+    else if (V.draw.edit) html = '<b>Eindpunten aanpassen</b> — sleep een bolletje naar de juiste plek.';
+    else html = 'Sleep een <b>rechte lijn</b> van punt naar punt. Twee vingers pannen/zoomen.';
   } else if (V.mode === 'sample') {
     html = 'Tik om een <b>kleur te sampelen</b>; 📌 pint de kleur vast als notitie. Tik een notitie aan om die te bekijken.';
   }
@@ -397,14 +402,20 @@ function setMode(mode) {
   $('#move-tools').hidden = mode !== 'move';
   $('#align-tools').hidden = mode !== 'align';
   $('#draw-tools').hidden = mode !== 'draw';
+  $('#layer-panel').hidden = mode !== 'draw';
   $('#sample-card').hidden = mode !== 'sample';
   $('#btn-align-apply').disabled = true;
   V.sample = null;
   V.selNote = -1;
+  V.draw.cur = null;
+  V.draw.editPt = null;
+  V.draw.editStroke = null;
   if (mode === 'sample') { updateSampleCard(); renderNotesRow(); }
   if (mode === 'draw') {
     settings().showDrawing = true;
     $('#set-showdrawing').checked = true;
+    renderLayerList();
+    updateDrawToggles();
   }
   updateHint();
   requestRender();
@@ -591,48 +602,165 @@ function computeMix() {
   }
 }
 
-/* ---------- tekenen op de referentie (rechte lijnstukken) ---------- */
+/* ---------- tekenlagen ---------- */
+function drawingLayers() { return session().drawing.layers; }
+function activeLayer() {
+  const d = session().drawing;
+  return d.layers[d.active];
+}
+
 // klik een uiteinde vast aan een bestaand lijnuiteinde binnen grijpafstand
-function snapToEndpoint(w) {
+function snapToEndpoint(w, exclude) {
+  if (!settings().drawSnap) return w;
   const tol = 12 / V.view.s;
   let best = null, bestD = tol;
-  for (const s of session().drawing.strokes) {
-    for (const p of [s.pts[0], s.pts[s.pts.length - 1]]) {
-      const d = dist(p, w);
-      if (d < bestD) { bestD = d; best = p; }
+  for (const layer of drawingLayers()) {
+    if (!layer.visible) continue;
+    for (const s of layer.strokes) {
+      for (const p of [s.pts[0], s.pts[s.pts.length - 1]]) {
+        if (p === exclude) continue;
+        const d = dist(p, w);
+        if (d < bestD) { bestD = d; best = p; }
+      }
     }
   }
   return best ? { x: best.x, y: best.y } : w;
 }
 
+// dichtstbijzijnde eindpunt van een zichtbare lijn om te verslepen
+function hitEndpoint(screenPt) {
+  const tol = 16;
+  let best = null, bestD = tol;
+  for (const layer of drawingLayers()) {
+    if (!layer.visible) continue;
+    for (const s of layer.strokes) {
+      for (const p of [s.pts[0], s.pts[s.pts.length - 1]]) {
+        const d = dist(worldToScreen(p), screenPt);
+        if (d < bestD) { bestD = d; best = { stroke: s, pt: p }; }
+      }
+    }
+  }
+  return best;
+}
+
+function drawEndpointHandles(ctx) {
+  if (!V.draw.edit) return;
+  const rr = 5 / V.view.s;
+  ctx.save();
+  ctx.lineWidth = 1.5 / V.view.s;
+  for (const layer of drawingLayers()) {
+    if (!layer.visible) continue;
+    for (const s of layer.strokes) {
+      for (const p of [s.pts[0], s.pts[s.pts.length - 1]]) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffffcc';
+        ctx.fill();
+        ctx.strokeStyle = '#000000aa';
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
 function eraseAt(w) {
-  const strokes = session().drawing.strokes;
   const tol = 10 / V.view.s;
-  for (let i = strokes.length - 1; i >= 0; i--) {
-    const s = strokes[i];
-    const hit = s.pts.length === 1
-      ? dist(s.pts[0], w) < s.w / 2 + tol
-      : s.pts.some((p, j) => j > 0 && distToSeg(w, s.pts[j - 1], p) < s.w / 2 + tol);
-    if (hit) {
-      strokes.splice(i, 1);
-      requestRender();
-      return;
+  for (const layer of drawingLayers()) {
+    if (!layer.visible) continue;
+    const strokes = layer.strokes;
+    for (let i = strokes.length - 1; i >= 0; i--) {
+      const s = strokes[i];
+      const hit = s.pts.length === 1
+        ? dist(s.pts[0], w) < s.w / 2 + tol
+        : s.pts.some((p, j) => j > 0 && distToSeg(w, s.pts[j - 1], p) < s.w / 2 + tol);
+      if (hit) {
+        strokes.splice(i, 1);
+        requestRender();
+        return;
+      }
     }
   }
 }
 
+function drawingEmpty() {
+  return drawingLayers().every(l => !l.strokes.length);
+}
+
 function saveDrawingVersion() {
   const s = session();
-  if (!s.drawing.strokes.length) { toast('Nog geen tekening om op te slaan'); return; }
+  if (drawingEmpty()) { toast('Nog geen tekening om op te slaan'); return; }
   const name = prompt('Naam voor deze tekenversie:', `Tekening ${s.drawingVersions.length + 1}`);
   if (name === null) return;
   s.drawingVersions.push({
     label: name.trim() || `Tekening ${s.drawingVersions.length + 1}`,
     created: Date.now(),
-    strokes: JSON.parse(JSON.stringify(s.drawing.strokes)),
+    drawing: JSON.parse(JSON.stringify(s.drawing)),
   });
   updateDrawVersionSelect();
   toast('Tekenversie opgeslagen ✓');
+}
+
+/* ---------- lagenbeheer-UI ---------- */
+function renderLayerList() {
+  const box = $('#layer-list');
+  if (!box) return;
+  box.innerHTML = '';
+  const d = session().drawing;
+  d.layers.forEach((layer, i) => {
+    const row = document.createElement('div');
+    row.className = 'layer-row' + (i === d.active ? ' active' : '');
+    const vis = document.createElement('button');
+    vis.className = 'vis';
+    vis.textContent = layer.visible ? '👁' : '⊘';
+    vis.title = layer.visible ? 'Laag verbergen' : 'Laag tonen';
+    vis.addEventListener('click', (e) => {
+      e.stopPropagation();
+      layer.visible = !layer.visible;
+      renderLayerList();
+      requestRender();
+    });
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = layer.name;
+    name.addEventListener('click', () => { d.active = i; renderLayerList(); });
+    name.addEventListener('dblclick', () => {
+      const nn = prompt('Laagnaam:', layer.name);
+      if (nn !== null) { layer.name = nn.trim() || layer.name; renderLayerList(); }
+    });
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = '🗑';
+    del.title = 'Laag verwijderen';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (d.layers.length === 1) { toast('Minstens één laag nodig'); return; }
+      if (layer.strokes.length && !confirm(`Laag “${layer.name}” verwijderen?`)) return;
+      d.layers.splice(i, 1);
+      d.active = Math.min(d.active, d.layers.length - 1);
+      renderLayerList();
+      requestRender();
+    });
+    row.append(vis, name, del);
+    box.appendChild(row);
+  });
+}
+
+function updateDrawToggles() {
+  $('#btn-eraser').classList.toggle('on', V.draw.erase);
+  $('#btn-edit').classList.toggle('on', V.draw.edit);
+  updateHint();
+  requestRender();
+}
+
+function addLayer() {
+  const d = session().drawing;
+  d.layers.push({ name: `Laag ${d.layers.length + 1}`, visible: true, strokes: [] });
+  d.active = d.layers.length - 1;
+  settings().showDrawing = true;
+  $('#set-showdrawing').checked = true;
+  renderLayerList();
+  requestRender();
 }
 
 function updateDrawVersionSelect() {
@@ -784,6 +912,10 @@ function onPointerDown(e) {
       const w = screenToWorld(p);
       if (V.draw.erase) {
         eraseAt(w);
+      } else if (V.draw.edit) {
+        // eindpunt van een bestaande lijn oppakken en verslepen
+        const grab = hitEndpoint(p);
+        if (grab) { V.draw.editPt = grab.pt; V.draw.editStroke = grab.stroke; }
       } else {
         const start = snapToEndpoint(w);
         V.draw.cur = { color: settings().drawColor, w: settings().drawWidth, pts: [start, start] };
@@ -823,6 +955,10 @@ function onPointerMove(e) {
       const w = screenToWorld(p);
       if (V.draw.erase) {
         eraseAt(w);
+      } else if (V.draw.editPt) {
+        const snapped = snapToEndpoint(w, V.draw.editPt);
+        V.draw.editPt.x = snapped.x;
+        V.draw.editPt.y = snapped.y;
       } else if (V.draw.cur) {
         V.draw.cur.pts[1] = snapToEndpoint(w);
       }
@@ -870,12 +1006,16 @@ function onPointerUp(e) {
   V.pointers.delete(e.pointerId);
 
   V.dragKind = null;
-  if (V.draw.cur && V.pointers.size === 0) {
-    // alleen een echt lijnstuk bewaren; een tikje zonder sleep vervalt
-    if (dist(V.draw.cur.pts[0], V.draw.cur.pts[1]) > 3 / V.view.s) {
-      session().drawing.strokes.push(V.draw.cur);
+  if (V.pointers.size === 0 && (V.draw.cur || V.draw.editPt)) {
+    if (V.draw.cur) {
+      // alleen een echt lijnstuk bewaren; een tikje zonder sleep vervalt
+      if (dist(V.draw.cur.pts[0], V.draw.cur.pts[1]) > 3 / V.view.s) {
+        activeLayer().strokes.push(V.draw.cur);
+      }
+      V.draw.cur = null;
     }
-    V.draw.cur = null;
+    V.draw.editPt = null;
+    V.draw.editStroke = null;
     requestRender();
   }
   if (g && g.type === 'single' && V.pointers.size === 0) {
@@ -1055,16 +1195,27 @@ function wireOverlay() {
   bind('#set-drawwidth', 'input', e => { settings().drawWidth = +e.target.value; });
   bind('#btn-eraser', 'click', () => {
     V.draw.erase = !V.draw.erase;
-    $('#btn-eraser').classList.toggle('on', V.draw.erase);
-    updateHint();
+    if (V.draw.erase) V.draw.edit = false;
+    updateDrawToggles();
   });
-  bind('#btn-draw-undo', 'click', () => { session().drawing.strokes.pop(); requestRender(); });
+  bind('#btn-edit', 'click', () => {
+    V.draw.edit = !V.draw.edit;
+    if (V.draw.edit) V.draw.erase = false;
+    updateDrawToggles();
+  });
+  bind('#btn-snap', 'click', () => {
+    settings().drawSnap = !settings().drawSnap;
+    $('#btn-snap').classList.toggle('on', settings().drawSnap);
+    toast(settings().drawSnap ? 'Snappen aan' : 'Snappen uit');
+  });
+  bind('#btn-draw-undo', 'click', () => { activeLayer().strokes.pop(); requestRender(); });
   bind('#btn-draw-clear', 'click', () => {
-    if (session().drawing.strokes.length && confirm('Hele tekening wissen?')) {
-      session().drawing.strokes = [];
+    if (activeLayer().strokes.length && confirm(`Laag “${activeLayer().name}” wissen?`)) {
+      activeLayer().strokes = [];
       requestRender();
     }
   });
+  bind('#btn-layer-add', 'click', addLayer);
   bind('#btn-drawversion-save', 'click', saveDrawingVersion);
   bind('#set-samplerad', 'input', e => {
     settings().sampleRadius = +e.target.value;
@@ -1102,9 +1253,10 @@ function wireOverlay() {
     const v = session().drawingVersions[+e.target.value];
     e.target.value = '';
     if (!v) return;
-    session().drawing.strokes = JSON.parse(JSON.stringify(v.strokes));
+    session().drawing = JSON.parse(JSON.stringify(v.drawing));
     settings().showDrawing = true;
     $('#set-showdrawing').checked = true;
+    renderLayerList();
     toast(`“${v.label}” geladen`);
     requestRender();
   });
