@@ -233,6 +233,11 @@
         </div>
         </div><!-- /.sheet-scroll -->
       </div>
+
+      <div class="util-cluster" id="util-cluster">
+        <button id="btn-flicker" class="fab" title="Flikkeren aan/uit">⚡</button>
+        <button id="btn-panel" class="fab" title="Instellingen">⚙️</button>
+      </div>
     </div>
 
     <div class="bar tools" id="align-tools" hidden>
@@ -266,17 +271,14 @@
       <button id="btn-draw-clear" title="Actieve laag wissen">🗑</button>
     </div>
 
-    <div class="bar main" id="mode-bar">
-      <button data-mode="pan" class="mode active" title="Bekijken (verschuiven/zoomen)">🖐</button>
-      <button data-mode="move" class="mode" title="Schets verplaatsen">✥</button>
-      <button data-mode="draw" class="mode" title="Tekenen op de referentie">✏️</button>
-      <button data-mode="sample" class="mode" title="Kleur sampelen (pipet)">💧</button>
-      <button data-mode="align" class="mode" title="Uitlijnen met 2 ankerpunten">⚓</button>
-      <button data-mode="measure" class="mode" title="Meten en vergelijken">📏</button>
-      <span class="sep"></span>
-      <button id="btn-flicker" title="Flikkeren aan/uit">⚡</button>
-      <button id="btn-panel" title="Instellingen">⚙️</button>
-    </div>
+    <nav class="tabbar" id="mode-bar">
+      <button data-mode="pan" class="mode active"><span class="ic">🖐</span><span class="tl">Bekijken</span></button>
+      <button data-mode="move" class="mode"><span class="ic">✥</span><span class="tl">Schets</span></button>
+      <button data-mode="draw" class="mode"><span class="ic">✏️</span><span class="tl">Tekenen</span></button>
+      <button data-mode="sample" class="mode"><span class="ic">💧</span><span class="tl">Kleur</span></button>
+      <button data-mode="align" class="mode"><span class="ic">⚓</span><span class="tl">Uitlijnen</span></button>
+      <button data-mode="measure" class="mode"><span class="ic">📏</span><span class="tl">Meten</span></button>
+    </nav>
   </section>
 
 </main>

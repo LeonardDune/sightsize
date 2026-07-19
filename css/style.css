@@ -245,35 +245,95 @@ input:disabled { opacity: 0.45; }
   background: var(--canvas-bg);
 }
 
+/* contextuele hulpstrook, direct boven de tabbalk — één regel, scrolt indien nodig */
 .bar {
   flex: 0 0 auto;
   display: flex;
   gap: 8px;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
   background: var(--bg2);
   border-top: 1px solid var(--line);
-  padding: 8px;
+  padding: 7px 10px;
 }
-.bar.main { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+.bar::-webkit-scrollbar { display: none; }
+.bar button, .bar input { flex: 0 0 auto; }
 .bar button {
   background: var(--bg3);
   border: none;
   color: var(--fg);
   border-radius: 9px;
-  padding: 10px 13px;
+  padding: 9px 12px;
   font-size: 16px;
   cursor: pointer;
   touch-action: manipulation;
 }
 .bar button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 15px; }
 .bar button:disabled { opacity: 0.4; cursor: default; }
-.bar button.mode.active { background: var(--accent); color: var(--accent-ink); }
-.bar .sep { width: 1px; align-self: stretch; background: var(--hover); margin: 0 2px; }
 .bar button.on { background: var(--accent2); color: var(--accent2-ink); }
 .bar input[type="color"] { width: 40px; height: 36px; padding: 0; border: none; background: none; cursor: pointer; }
-.bar input[type="range"] { width: 90px; accent-color: var(--accent); }
+.bar input[type="range"] { width: 76px; accent-color: var(--accent); }
+
+/* onderste tabbalk: de zes modi, icoon + label, gelijk verdeeld */
+.tabbar {
+  flex: 0 0 auto;
+  display: flex;
+  background: var(--bg2);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tabbar .mode {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 8px 2px 7px;
+  cursor: pointer;
+  touch-action: manipulation;
+  position: relative;
+}
+.tabbar .mode .ic { font-size: 19px; line-height: 1; }
+.tabbar .mode .tl { font-size: 10.5px; letter-spacing: 0.01em; }
+.tabbar .mode.active { color: var(--accent); }
+.tabbar .mode.active::before {
+  content: "";
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 26px; height: 3px; border-radius: 0 0 3px 3px;
+  background: var(--accent);
+}
+.tabbar .mode:active { background: var(--hover); }
+
+/* zwevende hulpknoppen (flikker + instellingen), rechtsonder in het beeld */
+.util-cluster {
+  position: absolute;
+  right: 12px; bottom: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+  z-index: 16;
+}
+.util-cluster[hidden] { display: none; }
+.fab {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  color: var(--fg);
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -4px var(--scrim);
+  display: grid; place-items: center;
+  touch-action: manipulation;
+}
+.fab:active { background: var(--hover); }
+.fab.on { background: var(--accent2); color: var(--accent2-ink); border-color: var(--accent2); }
+#btn-panel.fab.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
 .sample-card { font-size: 12.5px; line-height: 1.4; max-width: min(480px, calc(100% - 16px)); }
 .sample-card .sw {

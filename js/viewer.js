@@ -1318,10 +1318,12 @@ function openSheet(px) {
   p.hidden = false;
   filterContext();
   $('#btn-panel').classList.add('on');
+  $('#btn-flicker').hidden = true; // enkel het tandwiel blijft over de sheet zweven
 }
 function closeSheet() {
   $('#panel').hidden = true;
   $('#btn-panel').classList.remove('on');
+  $('#btn-flicker').hidden = false;
 }
 
 function wireSheet() {

@@ -61,7 +61,8 @@ Legenda: ✅ gebouwd · 🔜 volgende ronde · ⬜ open idee · 💡 optioneel/l
 - ✅ Hints alleen tonen in de modi die ze nodig hebben
 - ✅ **Dark/light thema** met semantische kleur-tokens (volwaardige lichte set), schakelaar in de kop (dark/light/auto), volgt OS-voorkeur, keuze onthouden
 - ✅ **Bottom-sheet-paneel**: instellingen als bodemblad met greep — sleep omhoog/omlaag tussen standen, veeg omlaag om te sluiten; zit in de duimzone en laat de modusbalk vrij
-- 💡 Nog open: grotere raak-doelen / verdere duimzone-optimalisatie
+- ✅ **Onderbalk herontworpen**: gelabelde tabbalk (6 modi, icoon + tekst), één contextuele hulpstrook erboven (scrolt i.p.v. wrappen), en flikker + instellingen als losse ronde knoppen rechtsonder — geen tandwiel/flikker meer tussen de modi
+- 💡 Nog open: verdere duimzone-optimalisatie / iconen als SVG i.p.v. emoji
 
 ### 2. Waarde- en temperatuuranalyse
 - ✅ **Waarde isoleren**: 9-staps schaal in Bekijken; toont alleen de band rond de gekozen waarde (werkt op kleur/grijs/waarden)
