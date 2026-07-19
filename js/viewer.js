@@ -50,6 +50,8 @@ function enterOverlay() {
   updateDrawVersionSelect();
   V.palette = null;
   renderPaletteRow();
+  renderNotesRow();
+  $('#mix-results').innerHTML = '';
   setMode('pan');
   applyFlicker();
   requestRender();
@@ -399,7 +401,7 @@ function setMode(mode) {
   $('#btn-align-apply').disabled = true;
   V.sample = null;
   V.selNote = -1;
-  if (mode === 'sample') updateSampleCard();
+  if (mode === 'sample') { updateSampleCard(); renderNotesRow(); }
   if (mode === 'draw') {
     settings().showDrawing = true;
     $('#set-showdrawing').checked = true;
@@ -434,6 +436,27 @@ function sampleInfoHtml(c, skC) {
     html += `<br>schets: waarde ${skStep}/9 — ${rel}`;
   }
   return html;
+}
+
+function renderNotesRow() {
+  const row = $('#notes-row');
+  row.innerHTML = '';
+  const notes = session().notes;
+  $('#notes-export').hidden = notes.length === 0;
+  notes.forEach((n, i) => {
+    const b = document.createElement('button');
+    b.style.background = rgbToHex(n.r, n.g, n.b);
+    b.title = `${rgbToHex(n.r, n.g, n.b)} · waarde ${valueStep(n.r, n.g, n.b)}/9`;
+    b.classList.toggle('hi', V.selNote === i);
+    b.addEventListener('click', () => {
+      V.selNote = V.selNote === i ? -1 : i;
+      V.sample = null;
+      renderNotesRow();
+      updateSampleCard();
+      requestRender();
+    });
+    row.appendChild(b);
+  });
 }
 
 function updateSampleCard() {
@@ -480,6 +503,7 @@ function computePalette() {
 function renderPaletteRow() {
   const row = $('#palette-row');
   row.innerHTML = '';
+  $('#palette-export').hidden = !V.palette || !V.palette.colors.length;
   if (!V.palette) return;
   V.palette.colors.forEach((c, i) => {
     const b = document.createElement('button');
@@ -504,15 +528,67 @@ function paletteHighlightCanvas() {
     cv.width = P.w;
     cv.height = P.h;
     const ctx = cv.getContext('2d');
+    // toon alleen de delen met deze kleur; de rest wordt effen achtergrond
     const id = ctx.createImageData(P.w, P.h);
     for (let i = 0; i < P.w * P.h; i++) {
-      if (P.assign[i] !== P.hi) id.data[i * 4 + 3] = 175;
+      if (P.assign[i] !== P.hi) {
+        id.data[i * 4] = 12;
+        id.data[i * 4 + 1] = 13;
+        id.data[i * 4 + 2] = 16;
+        id.data[i * 4 + 3] = 255;
+      }
     }
     ctx.putImageData(id, 0, 0);
     P.hiCanvas = cv;
     P.hiIdx = P.hi;
   }
   return P.hiCanvas;
+}
+
+/* ---------- palet / notities exporteren ---------- */
+function exportColors(which) {
+  const [what, fmt] = which.split('-');
+  const src = what === 'palette'
+    ? (V.palette ? V.palette.colors : [])
+    : session().notes;
+  if (!src.length) { toast('Niets om te exporteren'); return; }
+  const colors = src.map(c => ({ r: c.r, g: c.g, b: c.b, label: rgbToHex(c.r, c.g, c.b) }));
+  const base = (session().name || 'sightsize').replace(/[^\w-]+/g, '_');
+  const name = `${base}-${what === 'palette' ? 'palet' : 'notities'}`;
+  if (fmt === 'gpl') downloadFile(`${name}.gpl`, buildGpl(name, colors), 'text/plain');
+  else downloadFile(`${name}.ase`, buildAse(colors), 'application/octet-stream');
+  toast(`${colors.length} kleuren geëxporteerd (.${fmt})`);
+}
+
+/* ---------- mengsuggestie ---------- */
+function currentTargetColor() {
+  if (settings().mixTarget === 'note') {
+    return V.selNote >= 0 ? session().notes[V.selNote] : null;
+  }
+  return V.sample ? V.sample.ref : null;
+}
+
+function computeMix() {
+  const target = currentTargetColor();
+  const box = $('#mix-results');
+  if (!target) { box.innerHTML = '<div class="muted">Sample eerst een kleur (of kies een notitie).</div>'; return; }
+  const mixes = suggestMixes(target, PAINTS, 3);
+  box.innerHTML = '';
+  for (const m of mixes) {
+    const el = document.createElement('div');
+    el.className = 'mix-item';
+    const recipe = m.paints
+      .slice().sort((a, b) => b.weight - a.weight)
+      .map(p => `<span class="dot" style="background:${p.hex}"></span>${p.name} ${Math.round(p.weight * 100)}%`)
+      .join('<br>');
+    el.innerHTML =
+      `<span class="pair">
+         <span class="chip target" style="background:${rgbToHex(target.r, target.g, target.b)}" title="doel"></span>
+         <span class="chip mixed" style="background:${rgbToHex(m.rgb.r, m.rgb.g, m.rgb.b)}" title="mengsel"></span>
+       </span>
+       <span class="recipe">${recipe}<br><span class="de">verhouding ${m.ratio} · ΔE ${fmt(m.dE, 1)}</span></span>`;
+    box.appendChild(el);
+  }
 }
 
 /* ---------- tekenen op de referentie (rechte lijnstukken) ---------- */
@@ -617,6 +693,7 @@ function handleTap(world) {
       doSample(world);
     }
     updateSampleCard();
+    renderNotesRow();
     requestRender();
   }
 }
@@ -895,6 +972,7 @@ function syncPanel() {
   $('#set-palk').value = st.paletteK;
   $('#palk-out').textContent = st.paletteK;
   $('#set-shownotes').checked = st.showNotes;
+  $('#set-mixtarget').value = st.mixTarget;
   $('#set-flicker').checked = st.flicker;
   $('#set-flickerms').value = st.flickerMs;
   $('#set-grid').checked = st.grid;
@@ -1004,6 +1082,7 @@ function wireOverlay() {
     session().notes.push({ x: V.sample.world.x, y: V.sample.world.y, ...V.sample.ref });
     settings().showNotes = true;
     $('#set-shownotes').checked = true;
+    renderNotesRow();
     toast('Kleurnotitie vastgepind ✓');
     requestRender();
   });
@@ -1012,8 +1091,12 @@ function wireOverlay() {
     session().notes.splice(V.selNote, 1);
     V.selNote = -1;
     updateSampleCard();
+    renderNotesRow();
     requestRender();
   });
+  $$('[data-export]').forEach(b => b.addEventListener('click', () => exportColors(b.dataset.export)));
+  bind('#set-mixtarget', 'change', e => { settings().mixTarget = e.target.value; });
+  bind('#btn-mix', 'click', computeMix);
   bind('#set-drawversion', 'change', e => {
     if (e.target.value === '') return;
     const v = session().drawingVersions[+e.target.value];

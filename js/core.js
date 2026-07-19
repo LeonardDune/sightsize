@@ -495,6 +495,141 @@ function rgbToHsl(r, g, b) {
   return { h: h * 360, s, l };
 }
 
+/* ---------- palet-export: .gpl (GIMP/Krita/Inkscape) en .ase (Adobe) ---------- */
+function buildGpl(name, colors) {
+  const lines = ['GIMP Palette', `Name: ${name}`, 'Columns: 8', '#'];
+  for (const c of colors) {
+    const pad = (v) => String(clamp(Math.round(v), 0, 255)).padStart(3, ' ');
+    lines.push(`${pad(c.r)} ${pad(c.g)} ${pad(c.b)}\t${c.label || rgbToHex(c.r, c.g, c.b)}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+function buildAse(colors) {
+  const blocks = colors.map(c => {
+    const label = c.label || rgbToHex(c.r, c.g, c.b);
+    const nameLen = label.length + 1; // inclusief nul-terminator
+    const blockLen = 2 + nameLen * 2 + 4 + 12 + 2;
+    return { label, nameLen, blockLen };
+  });
+  const total = 12 + blocks.reduce((n, b) => n + 6 + b.blockLen, 0);
+  const buf = new ArrayBuffer(total);
+  const dv = new DataView(buf);
+  let o = 0;
+  const u16 = (v) => { dv.setUint16(o, v); o += 2; };
+  const u32 = (v) => { dv.setUint32(o, v); o += 4; };
+  const f32 = (v) => { dv.setFloat32(o, v); o += 4; };
+  const ascii = (s) => { for (const ch of s) dv.setUint8(o++, ch.charCodeAt(0)); };
+  ascii('ASEF');
+  u16(1); u16(0);            // versie 1.0
+  u32(colors.length);
+  colors.forEach((c, i) => {
+    const b = blocks[i];
+    u16(0x0001);             // kleurblok
+    u32(b.blockLen);
+    u16(b.nameLen);
+    for (const ch of b.label) u16(ch.charCodeAt(0)); // UTF-16BE
+    u16(0);                  // nul-terminator
+    ascii('RGB ');
+    f32(c.r / 255); f32(c.g / 255); f32(c.b / 255);
+    u16(2);                  // "normal" kleur
+  });
+  return buf;
+}
+
+function downloadFile(filename, data, mime) {
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime || 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/* ---------- verf mengen: enkelvoudige Kubelka-Munk-benadering ----------
+   Subtractieve menging per kanaal via K/S = (1-R)²/2R. Een benadering —
+   echte pigmenten verschillen — maar geel+blauw wordt hiermee wél groen,
+   waar RGB-middeling grijs zou opleveren.                                 */
+const PAINTS = [
+  { id: 'titaanwit', name: 'Titaanwit', hex: '#f6f3ea' },
+  { id: 'ivoorzwart', name: 'Ivoorzwart', hex: '#221f1e' },
+  { id: 'geleoker', name: 'Gele oker', hex: '#be8a33' },
+  { id: 'cadmiumgeel', name: 'Cadmiumgeel', hex: '#f0b400' },
+  { id: 'cadmiumrood', name: 'Cadmiumrood', hex: '#e03c1f' },
+  { id: 'alizarine', name: 'Alizarine karmozijn', hex: '#7a1f3d' },
+  { id: 'siennagebrand', name: 'Sienna gebrand', hex: '#7e3b17' },
+  { id: 'ombergebrand', name: 'Omber gebrand', hex: '#4e3220' },
+  { id: 'omberruw', name: 'Omber ruw', hex: '#6b5836' },
+  { id: 'ultramarijn', name: 'Ultramarijn', hex: '#2e3e8f' },
+  { id: 'phtaloblauw', name: 'Phtaloblauw', hex: '#0c2c55' },
+  { id: 'viridiaan', name: 'Viridiaan', hex: '#2e6f5a' },
+];
+PAINTS.forEach(p => Object.assign(p, hexToRgb(p.hex)));
+
+function linearToSrgb(v) {
+  v = clamp(v, 0, 1);
+  return Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055));
+}
+
+function kmMixRgb(paints, weights) {
+  const wSum = weights.reduce((a, b) => a + b, 0) || 1;
+  const out = { r: 0, g: 0, b: 0 };
+  for (const ch of ['r', 'g', 'b']) {
+    let ks = 0;
+    for (let i = 0; i < paints.length; i++) {
+      const R = clamp(srgbToLinear(paints[i][ch]), 0.004, 0.995);
+      ks += (weights[i] / wSum) * ((1 - R) * (1 - R)) / (2 * R);
+    }
+    out[ch] = linearToSrgb(1 + ks - Math.sqrt(ks * ks + 2 * ks));
+  }
+  return out;
+}
+
+function mixRatioString(weights) {
+  const parts = weights.map(w => Math.max(1, Math.round(w * 8)));
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+  const g = parts.reduce((a, b) => gcd(a, b));
+  return parts.map(p => p / g).join(' : ');
+}
+
+function suggestMixes(target, paints, n = 3) {
+  const tLab = rgbToLab(target.r, target.g, target.b);
+  const dE = (rgb) => {
+    const l = rgbToLab(rgb.r, rgb.g, rgb.b);
+    return Math.hypot(l.L - tLab.L, l.a - tLab.a, l.b - tLab.b);
+  };
+  const best = new Map(); // per combinatie van verven de beste verhouding
+  const consider = (idxs, ws) => {
+    const rgb = kmMixRgb(idxs.map(i => paints[i]), ws);
+    const d = dE(rgb);
+    const key = idxs.join(',');
+    const cur = best.get(key);
+    if (!cur || d < cur.dE) best.set(key, { idxs, ws, rgb, dE: d });
+  };
+  for (let i = 0; i < paints.length; i++) {
+    consider([i], [1]);
+    for (let j = i + 1; j < paints.length; j++) {
+      for (let w = 0.05; w < 0.999; w += 0.025) consider([i, j], [w, 1 - w]);
+      for (let k = j + 1; k < paints.length; k++) {
+        for (let w1 = 0.1; w1 <= 0.8; w1 += 0.1) {
+          for (let w2 = 0.1; w1 + w2 <= 0.9001; w2 += 0.1) {
+            consider([i, j, k], [w1, w2, 1 - w1 - w2]);
+          }
+        }
+      }
+    }
+  }
+  return [...best.values()]
+    .sort((a, b) => a.dE - b.dE)
+    .slice(0, n)
+    .map(m => ({
+      paints: m.idxs.map((i, k) => ({ ...paints[i], weight: m.ws[k] })),
+      rgb: m.rgb,
+      dE: m.dE,
+      ratio: mixRatioString(m.ws),
+    }));
+}
+
 /* ---------- kleur sampelen: gemiddelde over een cirkelgebied ---------- */
 function averageArea(canvas, cx, cy, rad) {
   const x0 = Math.floor(cx - rad), y0 = Math.floor(cy - rad);

@@ -117,12 +117,31 @@
         <label class="row" id="row-levels" hidden>Aantal waarden <input id="set-levels" type="range" min="2" max="8" step="1"><span class="out" id="levels-out"></span></label>
         <label class="row" id="row-threshold" hidden>Drempel <input id="set-threshold" type="range" min="16" max="240" step="1"></label>
         <label class="row" id="row-blur" hidden>Vervaging <input id="set-blur" type="range" min="0" max="12" step="1"></label>
-        <h3>Kleur</h3>
+        <h3>Kleur — pipet</h3>
         <label class="row">Pipetgrootte <input id="set-samplerad" type="range" min="2" max="30" step="1"></label>
+        <label class="row chk"><input id="set-shownotes" type="checkbox"> Kleurnotities tonen</label>
+        <div id="notes-row" class="palette-row"></div>
+        <div class="row btns" id="notes-export" hidden>
+          <button data-export="notes-gpl">⬇ .gpl</button>
+          <button data-export="notes-ase">⬇ .ase</button>
+        </div>
+        <h3>Kleur — palet</h3>
         <label class="row">Aantal kleuren <input id="set-palk" type="range" min="3" max="12" step="1"><span class="out" id="palk-out"></span></label>
         <div class="row btns"><button id="btn-palette">🎨 Bepaal palet</button></div>
         <div id="palette-row" class="palette-row"></div>
-        <label class="row chk"><input id="set-shownotes" type="checkbox"> Kleurnotities tonen</label>
+        <div class="row btns" id="palette-export" hidden>
+          <button data-export="palette-gpl">⬇ .gpl</button>
+          <button data-export="palette-ase">⬇ .ase</button>
+        </div>
+        <h3>Kleur — mengsuggestie</h3>
+        <label class="row">Doelkleur
+          <select id="set-mixtarget">
+            <option value="sample">Laatste pipet-sample</option>
+            <option value="note">Geselecteerde notitie</option>
+          </select>
+        </label>
+        <div class="row btns"><button id="btn-mix">🧪 Suggereer mengsel</button></div>
+        <div id="mix-results" class="mix-results"></div>
         <h3>Blockin-lijnen (automatisch)</h3>
         <label class="row chk"><input id="set-blvalues" type="checkbox"> Waardenlijnen</label>
         <label class="row chk"><input id="set-blcontours" type="checkbox"> Contourlijnen</label>

@@ -74,7 +74,7 @@ function defaultSettings() {
     showRef: true, showSketch: true, showDrawing: true,
     blockinValues: false, blockinContours: false, blockinDetail: 5,
     drawColor: '#22c55e', drawWidth: 6,
-    sampleRadius: 8, paletteK: 6, showNotes: true,
+    sampleRadius: 8, paletteK: 6, showNotes: true, mixTarget: 'sample',
     flicker: false, flickerMs: 600, grid: false, gridCm: 5,
   };
 }

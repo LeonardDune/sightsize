@@ -211,6 +211,24 @@ input:disabled { opacity: 0.45; }
 }
 .palette-row button.hi { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 
+.mix-results { display: flex; flex-direction: column; gap: 8px; margin-bottom: 13px; }
+.mix-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  background: var(--bg3);
+  border-radius: 8px;
+  padding: 7px 8px;
+}
+.mix-item .pair { display: flex; flex: 0 0 auto; }
+.mix-item .chip { width: 26px; height: 26px; border-radius: 6px; border: 1px solid #ffffff33; }
+.mix-item .chip.target { border-radius: 6px 0 0 6px; }
+.mix-item .chip.mixed { border-radius: 0 6px 6px 0; border-left: none; }
+.mix-item .recipe { flex: 1; line-height: 1.35; }
+.mix-item .recipe .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: middle; border: 1px solid #ffffff44; }
+.mix-item .de { color: var(--muted); font-variant-numeric: tabular-nums; }
+
 .hint {
   flex: 0 0 auto;
   background: var(--bg2);
