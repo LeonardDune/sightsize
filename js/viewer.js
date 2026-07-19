@@ -1304,6 +1304,61 @@ function filterContext() {
   }
 }
 
+/* ---------- instellingen-bodemblad ---------- */
+function wrapH() {
+  const el = document.querySelector('.canvas-wrap');
+  return (el && el.clientHeight) || window.innerHeight * 0.7;
+}
+function sheetSnaps() { const h = wrapH(); return [Math.round(h * 0.44), Math.round(h * 0.82)]; }
+
+function openSheet(px) {
+  const p = $('#panel');
+  const snaps = sheetSnaps();
+  p.style.setProperty('--sheet-h', (px || snaps[0]) + 'px');
+  p.hidden = false;
+  filterContext();
+  $('#btn-panel').classList.add('on');
+}
+function closeSheet() {
+  $('#panel').hidden = true;
+  $('#btn-panel').classList.remove('on');
+}
+
+function wireSheet() {
+  const p = $('#panel');
+  const handle = $('#sheet-handle');
+  let startY = 0, startH = 0, dragging = false;
+  const down = (e) => {
+    dragging = true;
+    startY = e.clientY;
+    startH = p.offsetHeight;
+    p.classList.add('dragging');
+    handle.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  };
+  const move = (e) => {
+    if (!dragging) return;
+    const h = wrapH();
+    const newH = clamp(startH + (startY - e.clientY), 60, h * 0.94);
+    p.style.setProperty('--sheet-h', newH + 'px');
+  };
+  const up = () => {
+    if (!dragging) return;
+    dragging = false;
+    p.classList.remove('dragging');
+    const h = wrapH();
+    const cur = p.offsetHeight;
+    if (cur < h * 0.24) { closeSheet(); return; }
+    const snaps = sheetSnaps();
+    const target = snaps.reduce((a, b) => Math.abs(b - cur) < Math.abs(a - cur) ? b : a);
+    p.style.setProperty('--sheet-h', target + 'px');
+  };
+  handle.addEventListener('pointerdown', down);
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', up);
+  handle.addEventListener('pointercancel', up);
+}
+
 // sliders alleen tonen bij de weergave waar ze bij horen
 const VALSCALE = ['#141414','#333333','#4d4d4d','#666666','#808080','#999999','#b3b3b3','#cccccc','#f2f2f2'];
 function buildValScale() {
@@ -1517,9 +1572,9 @@ function wireOverlay() {
   });
   $('#btn-panel').addEventListener('click', () => {
     const p = $('#panel');
-    p.hidden = !p.hidden;
-    if (!p.hidden) filterContext();
+    if (p.hidden) openSheet(); else closeSheet();
   });
+  wireSheet();
 
   $$('#move-tools [data-nudge]').forEach(b =>
     b.addEventListener('click', () => nudgeSketch(b.dataset.nudge)));
@@ -1638,7 +1693,7 @@ function wireOverlay() {
     requestRender();
   });
   bind('#btn-new-sketch', 'click', () => {
-    $('#panel').hidden = true;
+    closeSheet();
     leaveOverlay();
     App.goSource('sketch');
   });

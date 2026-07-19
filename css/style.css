@@ -356,7 +356,7 @@ input:disabled { opacity: 0.45; }
 }
 .hint b { color: var(--accent2); }
 
-/* ---- instellingenpaneel ---- */
+/* ---- zwevende panelen (o.a. tekenlagen) ---- */
 .panel {
   position: absolute;
   right: 8px;
@@ -372,6 +372,37 @@ input:disabled { opacity: 0.45; }
   z-index: 15;
   backdrop-filter: blur(6px);
 }
+
+/* ---- instellingen als bodemblad (bottom sheet) ---- */
+#panel.panel {
+  right: 0; left: 50%;
+  transform: translateX(-50%);
+  bottom: 0; top: auto;
+  width: 100%;
+  max-width: 620px;
+  height: var(--sheet-h, 46%);
+  max-height: 94%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 12px;
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 34px -14px var(--scrim);
+  backdrop-filter: blur(10px);
+}
+#panel.dragging { transition: none; }
+#panel:not(.dragging) { transition: height 0.16s ease; }
+.sheet-handle {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 42px; height: 4px; border-radius: 3px;
+  background: var(--muted); opacity: 0.5;
+  margin: 9px 0 7px;
+  cursor: grab; touch-action: none;
+}
+.sheet-handle:active { cursor: grabbing; }
+.sheet-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 .panel .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; font-size: 13.5px; }
 .panel .row input[type="range"] { flex: 1; max-width: 150px; accent-color: var(--accent); }
 .panel .row select { width: auto; margin: 0; padding: 6px 8px; font-size: 13.5px; }
