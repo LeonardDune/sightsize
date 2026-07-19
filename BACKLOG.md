@@ -56,13 +56,12 @@ Legenda: ✅ gebouwd · 🔜 volgende ronde · ⬜ open idee · 💡 optioneel/l
 ## 🔜 Volgende ronde (afgesproken volgorde)
 
 ### 1. Herindeling van de bediening
-- 🔜 **Contextueel bodempaneel** dat de actieve modus volgt (i.p.v. één mega-⚙️-paneel)
-- 🔜 **Vaste lagenstrook** met oogjes: foto · auto-lijnen · tekening · schets
-- 🔜 Bodempaneel versleepbaar hoog/laag en dichttikbaar; canvas maximaal vrij
-- 🔜 Hints alleen tonen in de modi die ze nodig hebben
-- *Referentie: mockup `scratchpad/mockup.html` (Color Study / ArtistAssistApp / Affinity)*
+- ✅ **Contextueel paneel** dat de actieve modus volgt (i.p.v. één mega-⚙️-paneel)
+- ✅ **Vaste lagenstrook** met oogjes: foto · auto-lijnen · tekening · schets
+- ✅ Hints alleen tonen in de modi die ze nodig hebben
+- 💡 Nog open: paneel als versleepbaar/dichttikbaar bodemblad i.p.v. hoek-overlay
 
-### 2. Waarde- en temperatuuranalyse
+### 2. Waarde- en temperatuuranalyse ← **nu aan de beurt**
 - 🔜 **Waardeschuif / waarde isoleren**: toon alleen tonen rond één waarde-band
 - 🔜 **Kleurtemperatuur-kaart** (warm-koud t.o.v. gemiddelde) als extra weergave
 

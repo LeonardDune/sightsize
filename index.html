@@ -84,6 +84,13 @@
 
   <!-- Overlay-weergave -->
   <section id="scr-overlay" class="screen full" hidden>
+    <div class="layer-strip" id="layer-strip">
+      <span class="lbl">Lagen</span>
+      <button class="lchip" data-layer="ref"><span class="eye">👁</span>Foto</button>
+      <button class="lchip" data-layer="blockin"><span class="eye">👁</span>Auto-lijnen</button>
+      <button class="lchip" data-layer="drawing"><span class="eye">👁</span>Tekening</button>
+      <button class="lchip" data-layer="sketch"><span class="eye">👁</span>Schets</button>
+    </div>
     <div class="hint" id="view-hint"></div>
     <div class="canvas-wrap">
       <canvas id="view-canvas"></canvas>
@@ -96,88 +103,108 @@
       </div>
 
       <div id="panel" class="panel" hidden>
-        <h3>Schets-overlay</h3>
-        <label class="row chk"><input id="set-showsketch" type="checkbox"> Tonen</label>
-        <label class="row">Dekking <input id="set-opacity" type="range" min="0" max="1" step="0.01"></label>
-        <label class="row">Weergave schets
-          <select id="set-sketchmode">
-            <option value="original">Origineel</option>
-            <option value="lines">Alleen lijnen</option>
-          </select>
-        </label>
-        <label class="row">Lijnkleur <input id="set-linecolor" type="color" value="#ff3b30"></label>
-        <label class="row">Mengmodus
-          <select id="set-blend">
-            <option value="normal">Normaal</option>
-            <option value="difference">Verschil</option>
-          </select>
-        </label>
-        <h3>Referentiefoto</h3>
-        <label class="row chk"><input id="set-showref" type="checkbox"> Tonen</label>
-        <label class="row">Modus
-          <select id="set-refmode">
-            <option value="color">Kleur</option>
-            <option value="gray">Grijswaarden</option>
-            <option value="values">Waarden (block-in)</option>
-            <option value="notan">Notan</option>
-          </select>
-        </label>
-        <label class="row" id="row-levels" hidden>Aantal waarden <input id="set-levels" type="range" min="2" max="8" step="1"><span class="out" id="levels-out"></span></label>
-        <label class="row" id="row-threshold" hidden>Drempel <input id="set-threshold" type="range" min="16" max="240" step="1"></label>
-        <label class="row" id="row-blur" hidden>Vervaging <input id="set-blur" type="range" min="0" max="12" step="1"></label>
-        <h3>Kleur — pipet</h3>
-        <label class="row">Pipetgrootte <input id="set-samplerad" type="range" min="2" max="30" step="1"></label>
-        <label class="row chk"><input id="set-shownotes" type="checkbox"> Kleurnotities tonen</label>
-        <div id="notes-row" class="palette-row"></div>
-        <div class="row btns" id="notes-export" hidden>
-          <button data-export="notes-gpl">⬇ .gpl</button>
-          <button data-export="notes-ase">⬇ .ase</button>
+        <div class="ctx" data-modes="pan">
+          <h3>Referentie-weergave</h3>
+          <label class="row">Modus
+            <select id="set-refmode">
+              <option value="color">Kleur</option>
+              <option value="gray">Grijswaarden</option>
+              <option value="values">Waarden (block-in)</option>
+              <option value="notan">Notan</option>
+            </select>
+          </label>
+          <label class="row" id="row-levels" hidden>Aantal waarden <input id="set-levels" type="range" min="2" max="8" step="1"><span class="out" id="levels-out"></span></label>
+          <label class="row" id="row-threshold" hidden>Drempel <input id="set-threshold" type="range" min="16" max="240" step="1"></label>
+          <label class="row" id="row-blur" hidden>Vervaging <input id="set-blur" type="range" min="0" max="12" step="1"></label>
         </div>
-        <h3>Kleur — palet</h3>
-        <label class="row">Aantal kleuren <input id="set-palk" type="range" min="3" max="12" step="1"><span class="out" id="palk-out"></span></label>
-        <div class="row btns"><button id="btn-palette">🎨 Bepaal palet</button></div>
-        <div id="palette-row" class="palette-row"></div>
-        <div class="row btns" id="palette-export" hidden>
-          <button data-export="palette-gpl">⬇ .gpl</button>
-          <button data-export="palette-ase">⬇ .ase</button>
+
+        <div class="ctx" data-modes="pan">
+          <h3>Blockin-lijnen (automatisch)</h3>
+          <label class="row chk"><input id="set-blvalues" type="checkbox"> Waardenlijnen</label>
+          <label class="row chk"><input id="set-blcontours" type="checkbox"> Contourlijnen</label>
+          <label class="row" id="row-blockin-detail" hidden>Detail <input id="set-blockindetail" type="range" min="1" max="10" step="1"></label>
         </div>
-        <h3>Kleur — mengsuggestie</h3>
-        <label class="row">Doelkleur
-          <select id="set-mixtarget">
-            <option value="sample">Laatste pipet-sample</option>
-            <option value="note">Geselecteerde notitie</option>
-          </select>
-        </label>
-        <div class="row btns"><button id="btn-mix">🧪 Suggereer mengsel</button></div>
-        <div id="mix-results" class="mix-results"></div>
-        <h3>Blockin-lijnen (automatisch)</h3>
-        <label class="row chk"><input id="set-blvalues" type="checkbox"> Waardenlijnen</label>
-        <label class="row chk"><input id="set-blcontours" type="checkbox"> Contourlijnen</label>
-        <label class="row" id="row-blockin-detail" hidden>Detail <input id="set-blockindetail" type="range" min="1" max="10" step="1"></label>
-        <h3>Tekening (zelf getekend)</h3>
-        <label class="row chk"><input id="set-showdrawing" type="checkbox"> Tonen</label>
-        <label class="row">Versie laden
-          <select id="set-drawversion"><option value="">— kies —</option></select>
-        </label>
-        <div class="row btns">
-          <button id="btn-drawversion-save">💾 Opslaan als versie</button>
+
+        <div class="ctx" data-modes="pan move">
+          <h3>Schets-overlay</h3>
+          <label class="row">Dekking <input id="set-opacity" type="range" min="0" max="1" step="0.01"></label>
+          <label class="row">Weergave schets
+            <select id="set-sketchmode">
+              <option value="original">Origineel</option>
+              <option value="lines">Alleen lijnen</option>
+            </select>
+          </label>
+          <label class="row">Lijnkleur <input id="set-linecolor" type="color" value="#ff3b30"></label>
+          <label class="row">Mengmodus
+            <select id="set-blend">
+              <option value="normal">Normaal</option>
+              <option value="difference">Verschil</option>
+            </select>
+          </label>
         </div>
-        <h3>Flikkeren</h3>
-        <label class="row chk"><input id="set-flicker" type="checkbox"> Flikkeren</label>
-        <label class="row">Snelheid <input id="set-flickerms" type="range" min="150" max="1500" step="50"></label>
-        <h3>Hulpmiddelen</h3>
-        <label class="row chk"><input id="set-grid" type="checkbox"> Raster</label>
-        <label class="row">Rastergrootte <input id="set-gridsize" type="range" min="1" max="10" step="0.5"></label>
-        <div class="row btns">
-          <button id="btn-guide-h">＋ Horizontaal</button>
-          <button id="btn-guide-v">＋ Verticaal</button>
-          <button id="btn-guides-clear">Wis hulplijnen</button>
+
+        <div class="ctx" data-modes="sample">
+          <h3>Kleur — pipet</h3>
+          <label class="row">Pipetgrootte <input id="set-samplerad" type="range" min="2" max="30" step="1"></label>
+          <label class="row chk"><input id="set-shownotes" type="checkbox"> Kleurnotities tonen</label>
+          <div id="notes-row" class="palette-row"></div>
+          <div class="row btns" id="notes-export" hidden>
+            <button data-export="notes-gpl">⬇ .gpl</button>
+            <button data-export="notes-ase">⬇ .ase</button>
+          </div>
+          <h3>Kleur — palet</h3>
+          <label class="row">Aantal kleuren <input id="set-palk" type="range" min="3" max="12" step="1"><span class="out" id="palk-out"></span></label>
+          <div class="row btns"><button id="btn-palette">🎨 Bepaal palet</button></div>
+          <div id="palette-row" class="palette-row"></div>
+          <div class="row btns" id="palette-export" hidden>
+            <button data-export="palette-gpl">⬇ .gpl</button>
+            <button data-export="palette-ase">⬇ .ase</button>
+          </div>
+          <h3>Kleur — mengsuggestie</h3>
+          <label class="row">Doelkleur
+            <select id="set-mixtarget">
+              <option value="sample">Laatste pipet-sample</option>
+              <option value="note">Geselecteerde notitie</option>
+            </select>
+          </label>
+          <div class="row btns"><button id="btn-mix">🧪 Suggereer mengsel</button></div>
+          <div id="mix-results" class="mix-results"></div>
         </div>
-        <h3>Schets</h3>
-        <label class="row">Versie <select id="set-version"></select></label>
-        <div class="row btns">
-          <button id="btn-new-sketch">＋ Nieuwe schetsfoto</button>
-          <button id="btn-view-reset">Beeld passend</button>
+
+        <div class="ctx" data-modes="draw">
+          <h3>Tekening — versies</h3>
+          <label class="row">Versie laden
+            <select id="set-drawversion"><option value="">— kies —</option></select>
+          </label>
+          <div class="row btns">
+            <button id="btn-drawversion-save">💾 Opslaan als versie</button>
+          </div>
+        </div>
+
+        <div class="ctx" data-modes="pan move">
+          <h3>Flikkeren</h3>
+          <label class="row chk"><input id="set-flicker" type="checkbox"> Flikkeren</label>
+          <label class="row">Snelheid <input id="set-flickerms" type="range" min="150" max="1500" step="50"></label>
+        </div>
+
+        <div class="ctx" data-modes="pan move draw sample align measure">
+          <h3>Hulpmiddelen</h3>
+          <label class="row chk"><input id="set-grid" type="checkbox"> Raster</label>
+          <label class="row">Rastergrootte <input id="set-gridsize" type="range" min="1" max="10" step="0.5"></label>
+          <div class="row btns">
+            <button id="btn-guide-h">＋ Horizontaal</button>
+            <button id="btn-guide-v">＋ Verticaal</button>
+            <button id="btn-guides-clear">Wis hulplijnen</button>
+          </div>
+        </div>
+
+        <div class="ctx" data-modes="pan move">
+          <h3>Schets</h3>
+          <label class="row">Versie <select id="set-version"></select></label>
+          <div class="row btns">
+            <button id="btn-new-sketch">＋ Nieuwe schetsfoto</button>
+            <button id="btn-view-reset">Beeld passend</button>
+          </div>
         </div>
       </div>
     </div>

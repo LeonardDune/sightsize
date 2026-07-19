@@ -477,10 +477,11 @@ function setMode(mode) {
   if (mode === 'sample') { updateSampleCard(); renderNotesRow(); }
   if (mode === 'draw') {
     settings().showDrawing = true;
-    $('#set-showdrawing').checked = true;
     renderLayerList();
     updateDrawToggles();
   }
+  refreshLayerStrip();
+  filterContext();
   updateHint();
   requestRender();
 }
@@ -866,7 +867,7 @@ function addLayer() {
   d.layers.unshift({ name: `Laag ${d._counter}`, visible: true, strokes: [] });
   d.active = 0;
   settings().showDrawing = true;
-  $('#set-showdrawing').checked = true;
+  refreshLayerStrip();
   renderLayerList();
   requestRender();
 }
@@ -1208,9 +1209,6 @@ function syncPanel() {
   $('#set-levels').value = st.refLevels;
   $('#set-threshold').value = st.refThreshold;
   $('#set-blur').value = st.refBlur;
-  $('#set-showref').checked = st.showRef;
-  $('#set-showsketch').checked = st.showSketch;
-  $('#set-showdrawing').checked = st.showDrawing;
   $('#set-blvalues').checked = st.blockinValues;
   $('#set-blcontours').checked = st.blockinContours;
   $('#set-blockindetail').value = st.blockinDetail;
@@ -1226,6 +1224,50 @@ function syncPanel() {
   $('#set-grid').checked = st.grid;
   $('#set-gridsize').value = st.gridCm;
   updateRefRows();
+  refreshLayerStrip();
+}
+
+/* ---------- persistente lagenstrook ---------- */
+function autoLinesOn() { return settings().blockinValues || settings().blockinContours; }
+
+function refreshLayerStrip() {
+  const st = settings();
+  const map = { ref: st.showRef, blockin: autoLinesOn(), drawing: st.showDrawing, sketch: st.showSketch };
+  for (const chip of $$('#layer-strip .lchip')) {
+    const on = map[chip.dataset.layer];
+    chip.classList.toggle('off', !on);
+    chip.querySelector('.eye').textContent = on ? '👁' : '⊘';
+  }
+}
+
+function toggleLayer(which) {
+  const st = settings();
+  if (which === 'ref') st.showRef = !st.showRef;
+  else if (which === 'drawing') st.showDrawing = !st.showDrawing;
+  else if (which === 'sketch') st.showSketch = !st.showSketch;
+  else if (which === 'blockin') {
+    if (autoLinesOn()) {
+      V.lastBlockin = { v: st.blockinValues, c: st.blockinContours };
+      st.blockinValues = st.blockinContours = false;
+    } else if (V.lastBlockin && (V.lastBlockin.v || V.lastBlockin.c)) {
+      st.blockinValues = V.lastBlockin.v;
+      st.blockinContours = V.lastBlockin.c;
+    } else {
+      st.blockinContours = true; // eerste keer: contourlijnen als standaard
+    }
+    $('#set-blvalues').checked = st.blockinValues;
+    $('#set-blcontours').checked = st.blockinContours;
+    updateRefRows();
+  }
+  refreshLayerStrip();
+  requestRender();
+}
+
+/* ---------- contextueel paneel: alleen secties van de actieve modus ---------- */
+function filterContext() {
+  for (const sec of $$('#panel .ctx')) {
+    sec.hidden = !sec.dataset.modes.split(' ').includes(V.mode);
+  }
 }
 
 // sliders alleen tonen bij de weergave waar ze bij horen
@@ -1271,7 +1313,9 @@ function wireOverlay() {
     applyFlicker();
   });
   $('#btn-panel').addEventListener('click', () => {
-    $('#panel').hidden = !$('#panel').hidden;
+    const p = $('#panel');
+    p.hidden = !p.hidden;
+    if (!p.hidden) filterContext();
   });
 
   $$('#move-tools [data-nudge]').forEach(b =>
@@ -1293,9 +1337,7 @@ function wireOverlay() {
   bind('#set-levels', 'input', e => { settings().refLevels = +e.target.value; updateRefRows(); requestRender(); });
   bind('#set-threshold', 'input', e => { settings().refThreshold = +e.target.value; requestRender(); });
   bind('#set-blur', 'input', e => { settings().refBlur = +e.target.value; requestRender(); });
-  bind('#set-showref', 'change', e => { settings().showRef = e.target.checked; requestRender(); });
-  bind('#set-showsketch', 'change', e => { settings().showSketch = e.target.checked; requestRender(); });
-  bind('#set-showdrawing', 'change', e => { settings().showDrawing = e.target.checked; requestRender(); });
+  $$('#layer-strip .lchip').forEach(c => c.addEventListener('click', () => toggleLayer(c.dataset.layer)));
   bind('#set-blvalues', 'change', e => { settings().blockinValues = e.target.checked; updateRefRows(); requestRender(); });
   bind('#set-blcontours', 'change', e => { settings().blockinContours = e.target.checked; updateRefRows(); requestRender(); });
   bind('#set-blockindetail', 'input', e => { settings().blockinDetail = +e.target.value; requestRender(); });
@@ -1363,7 +1405,7 @@ function wireOverlay() {
     if (!v) return;
     session().drawing = JSON.parse(JSON.stringify(v.drawing));
     settings().showDrawing = true;
-    $('#set-showdrawing').checked = true;
+    refreshLayerStrip();
     renderLayerList();
     toast(`“${v.label}” geladen`);
     requestRender();
