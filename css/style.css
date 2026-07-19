@@ -393,14 +393,20 @@ input:disabled { opacity: 0.45; }
 }
 #panel.dragging { transition: none; }
 #panel:not(.dragging) { transition: height 0.16s ease; }
+/* brede greepstrook zodat het blad makkelijk te pakken is */
 .sheet-handle {
   flex: 0 0 auto;
-  align-self: center;
-  width: 42px; height: 4px; border-radius: 3px;
-  background: var(--muted); opacity: 0.5;
-  margin: 9px 0 7px;
+  display: flex; align-items: center; justify-content: center;
+  height: 26px;
+  margin: 0 -16px 4px; /* strekt tot de randen voor een groot raakgebied */
   cursor: grab; touch-action: none;
 }
+.sheet-handle::before {
+  content: "";
+  width: 44px; height: 5px; border-radius: 3px;
+  background: var(--muted); opacity: 0.6;
+}
+.sheet-handle:hover::before { opacity: 0.9; }
 .sheet-handle:active { cursor: grabbing; }
 .sheet-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 .panel .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; font-size: 13.5px; }

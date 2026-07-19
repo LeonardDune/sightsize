@@ -1327,9 +1327,9 @@ function closeSheet() {
 function wireSheet() {
   const p = $('#panel');
   const handle = $('#sheet-handle');
-  let startY = 0, startH = 0, dragging = false;
+  let startY = 0, startH = 0, dragging = false, moved = false;
   const down = (e) => {
-    dragging = true;
+    dragging = true; moved = false;
     startY = e.clientY;
     startH = p.offsetHeight;
     p.classList.add('dragging');
@@ -1338,6 +1338,7 @@ function wireSheet() {
   };
   const move = (e) => {
     if (!dragging) return;
+    if (Math.abs(e.clientY - startY) > 4) moved = true;
     const h = wrapH();
     const newH = clamp(startH + (startY - e.clientY), 60, h * 0.94);
     p.style.setProperty('--sheet-h', newH + 'px');
@@ -1347,9 +1348,16 @@ function wireSheet() {
     dragging = false;
     p.classList.remove('dragging');
     const h = wrapH();
+    const snaps = sheetSnaps();
+    if (!moved) {
+      // tik op de greep: wissel tussen half en vol
+      const cur = p.offsetHeight;
+      const target = cur < (snaps[0] + snaps[1]) / 2 ? snaps[1] : snaps[0];
+      p.style.setProperty('--sheet-h', target + 'px');
+      return;
+    }
     const cur = p.offsetHeight;
     if (cur < h * 0.24) { closeSheet(); return; }
-    const snaps = sheetSnaps();
     const target = snaps.reduce((a, b) => Math.abs(b - cur) < Math.abs(a - cur) ? b : a);
     p.style.setProperty('--sheet-h', target + 'px');
   };
