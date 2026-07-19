@@ -20,6 +20,7 @@ const V = {
   selNote: -1,    // geselecteerde kleurnotitie in pipet-modus
   palette: null,  // {colors, assign, w, h, hi, hiCanvas, hiIdx}
   layerDrag: null, // actieve laag-versleepactie
+  rangeMarks: null, // donkerste/lichtste markeringen op ref + schets
   raf: 0,
 };
 
@@ -50,6 +51,9 @@ function enterOverlay() {
   updateVersionSelect();
   updateDrawVersionSelect();
   V.palette = null;
+  V.rangeMarks = null;
+  $('#histogram').hidden = true;
+  $('#range-info').hidden = true;
   renderPaletteRow();
   renderNotesRow();
   renderPaintList();
@@ -240,6 +244,29 @@ function renderScene() {
       ctx.strokeStyle = i === V.selNote ? '#4da3ff' : '#ffffff';
       ctx.stroke();
     });
+  }
+
+  // donkerste/lichtste markeringen uit de bereikanalyse (alleen in bekijken)
+  if (V.rangeMarks && V.mode === 'pan' && ov !== 'sketch') {
+    for (const m of V.rangeMarks) {
+      if (m.src === 'ref' && !st.showRef) continue;
+      if (m.src === 'sk' && !st.showSketch) continue;
+      const rr = 11 / V.view.s;
+      ctx.beginPath();
+      ctx.arc(m.world.x, m.world.y, rr, 0, Math.PI * 2);
+      ctx.fillStyle = m.kind === 'D' ? '#101318cc' : '#f4f1e8cc';
+      ctx.fill();
+      ctx.lineWidth = 2.5 / V.view.s;
+      ctx.strokeStyle = m.src === 'sk' ? '#ff5555' : '#4da3ff';
+      ctx.stroke();
+      ctx.fillStyle = m.kind === 'D' ? '#f4f1e8' : '#101318';
+      ctx.font = `${14 / V.view.s}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${m.kind}${m.step}`, m.world.x, m.world.y);
+    }
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
   }
 
   // pipet-markering
@@ -1331,8 +1358,12 @@ function updateMapLegend() {
 
 /* ---------- dynamisch bereik / histogram ---------- */
 function computeRange() {
-  const r = luminanceHistogram(refItem().canvas);
-  if (!r) return;
+  const ref = luminanceHistogram(refItem().canvas);
+  if (!ref) return;
+  const sk = activeSketch();
+  const skHist = sk ? luminanceHistogram(sk.canvas) : null;
+
+  // histogram tekenen: referentie als grijze staven, schets als rode omtrek
   const cv = $('#histogram');
   cv.hidden = false;
   const dpr = window.devicePixelRatio || 1;
@@ -1342,19 +1373,64 @@ function computeRange() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
   let max = 0;
-  for (const v of r.hist) if (v > max) max = v;
-  const bw = w / r.bins;
-  for (let i = 0; i < r.bins; i++) {
-    const bh = max ? (r.hist[i] / max) * (h - 4) : 0;
-    const g = Math.round(i / (r.bins - 1) * 255);
+  for (const v of ref.hist) if (v > max) max = v;
+  if (skHist) for (const v of skHist.hist) if (v > max) max = v;
+  const bw = w / ref.bins;
+  for (let i = 0; i < ref.bins; i++) {
+    const bh = max ? (ref.hist[i] / max) * (h - 4) : 0;
+    const g = Math.round(i / (ref.bins - 1) * 255);
     ctx.fillStyle = `rgb(${g},${g},${g})`;
     ctx.fillRect(i * bw, h - bh, Math.max(1, bw - 0.5), bh);
   }
+  if (skHist) {
+    ctx.strokeStyle = '#ff5555';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < skHist.bins; i++) {
+      const bh = max ? (skHist.hist[i] / max) * (h - 4) : 0;
+      const x = i * bw + bw / 2, y = h - bh;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // donkerste/lichtste plek lokaliseren op referentie (+ schets via transform)
+  const marks = [];
+  const er = findValueExtremes(refItem().canvas);
+  marks.push({ world: er.dark, step: er.dark.step, kind: 'D', src: 'ref' });
+  marks.push({ world: er.light, step: er.light.step, kind: 'L', src: 'ref' });
+  if (sk) {
+    const es = findValueExtremes(sk.canvas);
+    marks.push({ world: applySim(sk.transform, es.dark), step: es.dark.step, kind: 'D', src: 'sk' });
+    marks.push({ world: applySim(sk.transform, es.light), step: es.light.step, kind: 'L', src: 'sk' });
+  }
+  V.rangeMarks = marks;
+
   const info = $('#range-info');
   info.hidden = false;
-  info.innerHTML = `Bereik: waarde <b>${r.minStep}</b> t/m <b>${r.maxStep}</b> `
-    + `(${r.range} van 9 stappen) · <b>${r.key}</b>`
-    + `<br>Tip: een schilderij haalt zelden 9 waarden — comprimeer bewust.`;
+  let html = `<b>Referentie</b>: waarde ${ref.minStep}–${ref.maxStep} (${ref.range}/9) · ${ref.key}`;
+  if (skHist) {
+    html += `<br><b style="color:#ff8a8a">Schets</b>: waarde ${skHist.minStep}–${skHist.maxStep} (${skHist.range}/9)`;
+    if (skHist.minStep > ref.minStep + 0.5) html += ` — <b>je schets mist de donkerste noten</b>`;
+    else if (skHist.maxStep < ref.maxStep - 0.5) html += ` — <b>je schets mist de lichtste noten</b>`;
+    else html += ` — bereik komt overeen`;
+  }
+  html += `<br>D/L-ringen op het beeld tonen de donkerste en lichtste plek. Tik op het histogram om die waarde te isoleren.`;
+  info.innerHTML = html;
+  requestRender();
+}
+
+function isolateFromHistogram(e) {
+  const cv = $('#histogram');
+  const r = cv.getBoundingClientRect();
+  const frac = clamp((e.clientX - r.left) / r.width, 0, 1);
+  settings().refIsolate = clamp(1 + Math.round(frac * 8), 1, 9);
+  if (settings().refMode === 'notan' || settings().refMode === 'temp' || settings().refMode === 'chroma') {
+    settings().refMode = 'gray';
+    $('#set-refmode').value = 'gray';
+  }
+  updateRefRows();
+  requestRender();
 }
 
 /* ---------- verfdoos ---------- */
@@ -1527,6 +1603,7 @@ function wireOverlay() {
   bind('#set-mixtarget', 'change', e => { settings().mixTarget = e.target.value; });
   bind('#btn-mix', 'click', computeMix);
   bind('#btn-range', 'click', computeRange);
+  $('#histogram').addEventListener('click', isolateFromHistogram);
   bind('#btn-paint-add', 'click', addPaint);
   bind('#btn-paint-reset', 'click', () => {
     if (confirm('Verfdoos terugzetten naar de standaard twaalf?')) {

@@ -465,6 +465,36 @@ function luminanceHistogram(srcCv, bins = 64) {
   };
 }
 
+// donkerste en lichtste plek (klein gemiddeld gebied, niet één ruispixel)
+// terug in de coördinaten van het aangeleverde canvas
+function findValueExtremes(srcCv) {
+  const maxW = 180;
+  const s = Math.min(1, maxW / srcCv.width);
+  const w = Math.max(2, Math.round(srcCv.width * s));
+  const h = Math.max(2, Math.round(srcCv.height * s));
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  cv.getContext('2d').drawImage(srcCv, 0, 0, w, h);
+  const d = cv.getContext('2d').getImageData(0, 0, w, h).data;
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    g[i] = d[i * 4 + 3] < 128 ? -1
+      : 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  }
+  boxBlurGray(g, w, h, 2, 1);
+  let dark = 0, light = 0, dv = Infinity, lv = -Infinity;
+  for (let i = 0; i < w * h; i++) {
+    if (d[i * 4 + 3] < 128) continue;
+    if (g[i] < dv) { dv = g[i]; dark = i; }
+    if (g[i] > lv) { lv = g[i]; light = i; }
+  }
+  const pt = (idx, v) => ({
+    x: ((idx % w) + 0.5) / s, y: ((idx / w | 0) + 0.5) / s,
+    step: clamp(1 + Math.round(v / 255 * 8), 1, 9),
+  });
+  return { dark: pt(dark, dv), light: pt(light, lv) };
+}
+
 /* ---------- verfdoos (standaard) ---------- */
 const DEFAULT_PAINTS = [
   { id: 'titaanwit', name: 'Titaanwit', hex: '#f6f3ea' },
