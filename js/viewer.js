@@ -90,14 +90,15 @@ function viewFit() {
 function refView() {
   const it = refItem();
   const st = settings();
-  if (st.refMode === 'color') return it.canvas;
-  const key = `${st.refMode}|${st.refLevels}|${st.refThreshold}|${st.refBlur}`;
+  // ongewijzigde kleurfoto: geen bewerking nodig
+  if (st.refMode === 'color' && st.refIsolate <= 0) return it.canvas;
+  const key = `${st.refMode}|${st.refLevels}|${st.refThreshold}|${st.refBlur}|${st.refIsolate}`;
   if (!it.derived || it.derived.key !== key) {
     it.derived = {
       key,
       canvas: reduceValues(it.canvas, {
         mode: st.refMode, levels: st.refLevels,
-        threshold: st.refThreshold, blur: st.refBlur,
+        threshold: st.refThreshold, blur: st.refBlur, isolate: st.refIsolate,
       }),
     };
   }
@@ -1257,8 +1258,8 @@ function toggleLayer(which) {
     }
     $('#set-blvalues').checked = st.blockinValues;
     $('#set-blcontours').checked = st.blockinContours;
-    updateRefRows();
   }
+  updateRefRows();
   refreshLayerStrip();
   requestRender();
 }
@@ -1271,13 +1272,39 @@ function filterContext() {
 }
 
 // sliders alleen tonen bij de weergave waar ze bij horen
+const VALSCALE = ['#141414','#333333','#4d4d4d','#666666','#808080','#999999','#b3b3b3','#cccccc','#f2f2f2'];
+function buildValScale() {
+  const el = $('#valscale');
+  if (el.children.length) return;
+  VALSCALE.forEach((c, i) => {
+    const s = document.createElement('span');
+    s.style.background = c;
+    s.dataset.v = i + 1;
+    s.title = `Waarde ${i + 1}/9`;
+    s.addEventListener('click', () => {
+      const st = settings();
+      st.refIsolate = st.refIsolate === i + 1 ? -1 : i + 1;
+      updateRefRows();
+      requestRender();
+    });
+    el.appendChild(s);
+  });
+}
+
 function updateRefRows() {
-  const mode = settings().refMode;
+  buildValScale();
+  const st = settings();
+  const mode = st.refMode;
   $('#row-levels').hidden = mode !== 'values';
   $('#row-threshold').hidden = mode !== 'notan';
-  $('#row-blur').hidden = mode !== 'values' && mode !== 'notan';
-  $('#levels-out').textContent = settings().refLevels;
-  $('#row-blockin-detail').hidden = !settings().blockinValues && !settings().blockinContours;
+  $('#row-blur').hidden = mode === 'color' || mode === 'gray';
+  $('#levels-out').textContent = st.refLevels;
+  // waarde isoleren: zinvol op kleur/grijs/waarden, niet op notan of temperatuur
+  $('#row-isolate').hidden = mode === 'notan' || mode === 'temp';
+  $$('#valscale span').forEach(s => s.classList.toggle('sel', +s.dataset.v === st.refIsolate));
+  $('#btn-isolate-off').style.opacity = st.refIsolate > 0 ? '1' : '0.5';
+  $('#row-blockin-detail').hidden = !st.blockinValues && !st.blockinContours;
+  $('#temp-legend').hidden = !(mode === 'temp' && st.showRef);
 }
 
 function updateVersionSelect() {
@@ -1334,6 +1361,7 @@ function wireOverlay() {
   bind('#set-linecolor', 'change', e => { settings().lineColor = e.target.value; requestRender(); });
   bind('#set-blend', 'change', e => { settings().blend = e.target.value; requestRender(); });
   bind('#set-refmode', 'change', e => { settings().refMode = e.target.value; updateRefRows(); requestRender(); });
+  bind('#btn-isolate-off', 'click', () => { settings().refIsolate = -1; updateRefRows(); requestRender(); });
   bind('#set-levels', 'input', e => { settings().refLevels = +e.target.value; updateRefRows(); requestRender(); });
   bind('#set-threshold', 'input', e => { settings().refThreshold = +e.target.value; requestRender(); });
   bind('#set-blur', 'input', e => { settings().refBlur = +e.target.value; requestRender(); });

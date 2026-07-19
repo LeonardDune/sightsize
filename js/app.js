@@ -70,7 +70,7 @@ const App = {
 function defaultSettings() {
   return {
     opacity: 0.55, sketchMode: 'original', blend: 'normal', lineColor: '#ff3b30',
-    refMode: 'color', refLevels: 4, refThreshold: 128, refBlur: 2,
+    refMode: 'color', refLevels: 4, refThreshold: 128, refBlur: 2, refIsolate: -1,
     showRef: true, showSketch: true, showDrawing: true,
     blockinValues: false, blockinContours: false, blockinDetail: 5,
     drawColor: '#22c55e', drawWidth: 6, drawSnap: true,

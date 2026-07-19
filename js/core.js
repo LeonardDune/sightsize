@@ -427,8 +427,9 @@ function boxBlurGray(g, w, h, radius, iterations = 2) {
   return g;
 }
 
-// mode: 'gray' | 'values' (posterize naar `levels` niveaus) | 'notan' (drempel)
-function reduceValues(srcCv, { mode, levels = 4, threshold = 128, blur = 0 }) {
+// mode: 'gray' | 'values' (posterize) | 'notan' (drempel) | 'temp' (warm-koud)
+// isolate: -1 uit, anders toont alleen de waardeband rond stap 1..9
+function reduceValues(srcCv, { mode, levels = 4, threshold = 128, blur = 0, isolate = -1 }) {
   const w = srcCv.width, h = srcCv.height;
   const d = srcCv.getContext('2d').getImageData(0, 0, w, h).data;
   let g = new Float32Array(w * h);
@@ -436,6 +437,15 @@ function reduceValues(srcCv, { mode, levels = 4, threshold = 128, blur = 0 }) {
     g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
   }
   if (blur > 0 && mode !== 'gray') g = boxBlurGray(g, w, h, blur);
+
+  // kleurtemperatuur: warmte = rood − blauw, afgezet tegen het beeldgemiddelde
+  let meanWarm = 0;
+  if (mode === 'temp') {
+    let s = 0;
+    for (let i = 0; i < w * h; i++) s += d[i * 4] - d[i * 4 + 2];
+    meanWarm = s / (w * h);
+  }
+
   const out = document.createElement('canvas');
   out.width = w;
   out.height = h;
@@ -443,13 +453,27 @@ function reduceValues(srcCv, { mode, levels = 4, threshold = 128, blur = 0 }) {
   const od = octx.createImageData(w, h);
   const o = od.data;
   for (let i = 0; i < w * h; i++) {
-    let v = g[i];
-    if (mode === 'values') {
-      v = Math.round((v / 255) * (levels - 1)) / (levels - 1) * 255;
-    } else if (mode === 'notan') {
-      v = v < threshold ? 0 : 255;
+    let r, gg, b;
+    const lum = g[i];
+    if (mode === 'temp') {
+      const dev = clamp((d[i * 4] - d[i * 4 + 2] - meanWarm) / 60, -1, 1);
+      r = clamp(lum + dev * 85 + 18, 0, 255);
+      gg = clamp(lum * 0.92, 0, 255);
+      b = clamp(lum - dev * 85 + 18, 0, 255);
+    } else if (mode === 'color') {
+      r = d[i * 4]; gg = d[i * 4 + 1]; b = d[i * 4 + 2];
+    } else {
+      let v = lum;
+      if (mode === 'values') v = Math.round((v / 255) * (levels - 1)) / (levels - 1) * 255;
+      else if (mode === 'notan') v = v < threshold ? 0 : 255;
+      r = gg = b = v;
     }
-    o[i * 4] = o[i * 4 + 1] = o[i * 4 + 2] = v;
+    // waarde isoleren: alleen de band rond de gekozen stap zichtbaar
+    if (isolate > 0 && mode !== 'notan' && mode !== 'temp') {
+      const step = clamp(1 + Math.round(lum / 255 * 8), 1, 9);
+      if (Math.abs(step - isolate) > 1) { r = 12; gg = 13; b = 16; }
+    }
+    o[i * 4] = r; o[i * 4 + 1] = gg; o[i * 4 + 2] = b;
     o[i * 4 + 3] = d[i * 4 + 3];
   }
   octx.putImageData(od, 0, 0);

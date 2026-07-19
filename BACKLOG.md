@@ -61,9 +61,9 @@ Legenda: ✅ gebouwd · 🔜 volgende ronde · ⬜ open idee · 💡 optioneel/l
 - ✅ Hints alleen tonen in de modi die ze nodig hebben
 - 💡 Nog open: paneel als versleepbaar/dichttikbaar bodemblad i.p.v. hoek-overlay
 
-### 2. Waarde- en temperatuuranalyse ← **nu aan de beurt**
-- 🔜 **Waardeschuif / waarde isoleren**: toon alleen tonen rond één waarde-band
-- 🔜 **Kleurtemperatuur-kaart** (warm-koud t.o.v. gemiddelde) als extra weergave
+### 2. Waarde- en temperatuuranalyse
+- ✅ **Waarde isoleren**: 9-staps schaal in Bekijken; toont alleen de band rond de gekozen waarde (werkt op kleur/grijs/waarden)
+- ✅ **Kleurtemperatuur-kaart** (warm-koud t.o.v. gemiddelde) als extra referentie-weergave, met legenda
 
 ---
 

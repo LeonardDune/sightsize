@@ -173,6 +173,15 @@ input:disabled { opacity: 0.45; }
 .dims-inputs label { flex: 1; }
 
 /* ---- canvasschermen ---- */
+#temp-legend {
+  position: absolute;
+  right: 10px; bottom: 10px;
+  display: flex; align-items: center; gap: 7px;
+  background: #0c0e12d9; border: 1px solid #0009; border-radius: 9px;
+  padding: 6px 9px; font-size: 11px; color: var(--fg); z-index: 8; pointer-events: none;
+}
+#temp-legend .bar { width: 72px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #5aa9ff, #d9d4c8, #ff7a4d); }
+
 #corner-canvas, #view-canvas {
   position: absolute;
   inset: 0;
@@ -314,6 +323,12 @@ input:disabled { opacity: 0.45; }
 .panel .row select { width: auto; margin: 0; padding: 6px 8px; font-size: 13.5px; }
 .panel .row input[type="color"] { width: 42px; height: 30px; padding: 0; border: none; background: none; }
 .panel .row .out { min-width: 1.4em; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.panel .k-inline { font-size: 13.5px; color: var(--fg); }
+#row-isolate { margin-bottom: 13px; }
+.valscale { display: flex; gap: 2px; height: 26px; border-radius: 7px; overflow: hidden; margin: 4px 0 8px; }
+.valscale span { flex: 1; cursor: pointer; position: relative; }
+.valscale span.sel { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 1; }
+.valscale span:hover { filter: brightness(1.15); }
 .panel .row.chk { justify-content: flex-start; }
 .panel .row.chk input { accent-color: var(--accent); width: 18px; height: 18px; }
 .panel .row.btns { flex-wrap: wrap; justify-content: flex-start; }

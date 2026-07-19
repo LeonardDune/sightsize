@@ -94,6 +94,7 @@
     <div class="hint" id="view-hint"></div>
     <div class="canvas-wrap">
       <canvas id="view-canvas"></canvas>
+      <div id="temp-legend" hidden><span>koel</span><span class="bar"></span><span>warm</span></div>
       <div class="panel layer-panel" id="layer-panel" hidden>
         <div class="layer-head">
           <span>Tekenlagen</span>
@@ -111,11 +112,17 @@
               <option value="gray">Grijswaarden</option>
               <option value="values">Waarden (block-in)</option>
               <option value="notan">Notan</option>
+              <option value="temp">Kleurtemperatuur</option>
             </select>
           </label>
           <label class="row" id="row-levels" hidden>Aantal waarden <input id="set-levels" type="range" min="2" max="8" step="1"><span class="out" id="levels-out"></span></label>
           <label class="row" id="row-threshold" hidden>Drempel <input id="set-threshold" type="range" min="16" max="240" step="1"></label>
           <label class="row" id="row-blur" hidden>Vervaging <input id="set-blur" type="range" min="0" max="12" step="1"></label>
+          <div id="row-isolate">
+            <div class="row"><span class="k-inline">Waarde isoleren</span></div>
+            <div class="valscale" id="valscale"></div>
+            <div class="row btns"><button id="btn-isolate-off">Alle waarden tonen</button></div>
+          </div>
         </div>
 
         <div class="ctx" data-modes="pan">
