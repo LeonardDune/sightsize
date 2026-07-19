@@ -252,6 +252,8 @@ input:disabled { opacity: 0.45; }
   padding: 5px 6px;
 }
 .layer-row.active { border-color: var(--accent); }
+.layer-row.dragging { opacity: 0.6; background: #333945; }
+.layer-row .handle { background: none; border: none; color: var(--muted); font-size: 15px; cursor: grab; padding: 2px 2px; line-height: 1; touch-action: none; }
 .layer-row .vis, .layer-row .del { background: none; border: none; color: var(--fg); font-size: 15px; cursor: pointer; padding: 2px 4px; line-height: 1; }
 .layer-row .name { flex: 1; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .layer-row.active .name { font-weight: 600; }

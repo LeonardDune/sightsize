@@ -19,6 +19,7 @@ const V = {
   sample: null,   // laatste pipet-meting {world, ref:{r,g,b}, sk:{r,g,b}|null}
   selNote: -1,    // geselecteerde kleurnotitie in pipet-modus
   palette: null,  // {colors, assign, w, h, hi, hiCanvas, hiIdx}
+  layerDrag: null, // actieve laag-versleepactie
   raf: 0,
 };
 
@@ -215,10 +216,11 @@ function renderScene() {
     ctx.restore();
   }
 
-  // eigen tekening: alle zichtbare lagen
+  // eigen tekening: zichtbare lagen, onderaan de lijst = onderop getekend
   if (st.showDrawing && ov !== 'sketch') {
-    for (const layer of drawingLayers()) {
-      if (layer.visible) drawStrokes(ctx, layer.strokes);
+    const layers = drawingLayers();
+    for (let i = layers.length - 1; i >= 0; i--) {
+      if (layers[i].visible) drawStrokes(ctx, layers[i].strokes);
     }
     if (V.draw.cur) drawStrokes(ctx, [V.draw.cur]);
     if (V.mode === 'draw') drawEndpointHandles(ctx);
@@ -280,6 +282,68 @@ function renderScene() {
     }
     ctx.stroke();
   }
+
+  // loep tijdens het verslepen van een eindpunt
+  if (V.mode === 'draw' && V.draw.editPt) drawLoupe(ctx, V.draw.editPt);
+}
+
+// loep: uitvergroting van de referentie rond een punt (zoals bij de hoekpunten)
+function drawLoupe(ctx, world) {
+  const r = V.cv.getBoundingClientRect();
+  const sp = worldToScreen(world);
+  const rad = 54, zoom = 2.6;
+  const scale = V.view.s * zoom;
+  const half = rad / scale;
+  let lx = sp.x, ly = sp.y - 96;
+  if (ly < rad + 8) ly = sp.y + 96;
+  lx = clamp(lx, rad + 6, r.width - rad - 6);
+  ly = clamp(ly, rad + 6, r.height - rad - 6);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(lx, ly, rad, 0, Math.PI * 2);
+  ctx.clip();
+  // achtergrond: referentie of papier
+  ctx.fillStyle = '#0c0d10';
+  ctx.fillRect(lx - rad, ly - rad, rad * 2, rad * 2);
+  if (settings().showRef) {
+    ctx.drawImage(refView(), world.x - half, world.y - half, half * 2, half * 2,
+      lx - rad, ly - rad, rad * 2, rad * 2);
+  } else {
+    ctx.fillStyle = '#ece8dd';
+    ctx.fillRect(lx - rad, ly - rad, rad * 2, rad * 2);
+  }
+  // zichtbare tekenlijnen mee in de loep
+  const map = (p) => ({ x: (p.x - world.x) * scale + lx, y: (p.y - world.y) * scale + ly });
+  ctx.lineCap = 'round';
+  for (const layer of drawingLayers()) {
+    if (!layer.visible) continue;
+    for (const s of layer.strokes) {
+      if (s.pts.length < 2) continue;
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = s.w * scale;
+      ctx.beginPath();
+      const a = map(s.pts[0]), b = map(s.pts[s.pts.length - 1]);
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  // dradenkruis op het punt
+  ctx.save();
+  ctx.strokeStyle = '#4da3ff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(lx - rad, ly); ctx.lineTo(lx + rad, ly);
+  ctx.moveTo(lx, ly - rad); ctx.lineTo(lx, ly + rad);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(lx, ly, rad, 0, Math.PI * 2);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawGrid(ctx, ref, st) {
@@ -710,6 +774,11 @@ function renderLayerList() {
   d.layers.forEach((layer, i) => {
     const row = document.createElement('div');
     row.className = 'layer-row' + (i === d.active ? ' active' : '');
+    const handle = document.createElement('button');
+    handle.className = 'handle';
+    handle.textContent = '⠿';
+    handle.title = 'Sleep om de volgorde te wijzigen';
+    handle.addEventListener('pointerdown', (e) => startLayerDrag(e, layer));
     const vis = document.createElement('button');
     vis.className = 'vis';
     vis.textContent = layer.visible ? '👁' : '⊘';
@@ -741,9 +810,46 @@ function renderLayerList() {
       renderLayerList();
       requestRender();
     });
-    row.append(vis, name, del);
+    row.append(handle, vis, name, del);
+    if (V.layerDrag && V.layerDrag.layer === layer) row.classList.add('dragging');
     box.appendChild(row);
   });
+}
+
+// lagen slepen om de stapelvolgorde te wijzigen
+function startLayerDrag(e, layer) {
+  e.preventDefault();
+  e.stopPropagation();
+  const d = session().drawing;
+  const activeObj = d.layers[d.active];
+  V.layerDrag = { layer };
+  const box = $('#layer-list');
+  const move = (ev) => {
+    const rows = [...box.children];
+    let target = rows.findIndex(rw => {
+      const rect = rw.getBoundingClientRect();
+      return ev.clientY < rect.top + rect.height / 2;
+    });
+    if (target < 0) target = d.layers.length;
+    const cur = d.layers.indexOf(layer);
+    let ins = target > cur ? target - 1 : target;
+    ins = clamp(ins, 0, d.layers.length - 1);
+    if (ins !== cur) {
+      d.layers.splice(cur, 1);
+      d.layers.splice(ins, 0, layer);
+      d.active = d.layers.indexOf(activeObj);
+      renderLayerList();
+      requestRender();
+    }
+  };
+  const up = () => {
+    V.layerDrag = null;
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    renderLayerList();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
 }
 
 function updateDrawToggles() {
@@ -755,8 +861,10 @@ function updateDrawToggles() {
 
 function addLayer() {
   const d = session().drawing;
-  d.layers.push({ name: `Laag ${d.layers.length + 1}`, visible: true, strokes: [] });
-  d.active = d.layers.length - 1;
+  // nieuwe laag bovenop: vooraan in de lijst (die van boven naar onder stapelt)
+  d._counter = (d._counter || d.layers.length) + 1;
+  d.layers.unshift({ name: `Laag ${d._counter}`, visible: true, strokes: [] });
+  d.active = 0;
   settings().showDrawing = true;
   $('#set-showdrawing').checked = true;
   renderLayerList();
