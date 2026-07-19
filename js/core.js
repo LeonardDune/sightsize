@@ -427,7 +427,64 @@ function boxBlurGray(g, w, h, radius, iterations = 2) {
   return g;
 }
 
-// mode: 'gray' | 'values' (posterize) | 'notan' (drempel) | 'temp' (warm-koud)
+/* ---------- luminantiehistogram / dynamisch bereik ---------- */
+function luminanceHistogram(srcCv, bins = 64) {
+  const maxW = 200;
+  const s = Math.min(1, maxW / srcCv.width);
+  const w = Math.max(2, Math.round(srcCv.width * s));
+  const h = Math.max(2, Math.round(srcCv.height * s));
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  cv.getContext('2d').drawImage(srcCv, 0, 0, w, h);
+  const d = cv.getContext('2d').getImageData(0, 0, w, h).data;
+  const hist = new Float64Array(bins);
+  let n = 0, minL = 255, maxL = 0, sum = 0;
+  const stepCount = new Float64Array(9);
+  for (let i = 0; i < w * h; i++) {
+    if (d[i * 4 + 3] < 128) continue;
+    const L = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+    hist[Math.min(bins - 1, (L / 256 * bins) | 0)]++;
+    stepCount[clamp(Math.round(L / 255 * 8), 0, 8)]++;
+    if (L < minL) minL = L;
+    if (L > maxL) maxL = L;
+    sum += L; n++;
+  }
+  if (!n) return null;
+  // donkerste/lichtste bezette waardestap (drempel tegen ruis: >0.3%)
+  let loStep = 9, hiStep = 1;
+  for (let k = 0; k < 9; k++) {
+    if (stepCount[k] > n * 0.003) { loStep = Math.min(loStep, k + 1); hiStep = Math.max(hiStep, k + 1); }
+  }
+  const meanStep = 1 + sum / n / 255 * 8;
+  const key = meanStep >= 6 ? 'high-key (overwegend licht)'
+    : meanStep <= 4 ? 'low-key (overwegend donker)' : 'middenwaarden';
+  return {
+    hist, bins, n,
+    minStep: loStep, maxStep: hiStep, range: hiStep - loStep + 1,
+    meanStep, key,
+  };
+}
+
+/* ---------- verfdoos (standaard) ---------- */
+const DEFAULT_PAINTS = [
+  { id: 'titaanwit', name: 'Titaanwit', hex: '#f6f3ea' },
+  { id: 'ivoorzwart', name: 'Ivoorzwart', hex: '#221f1e' },
+  { id: 'geleoker', name: 'Gele oker', hex: '#be8a33' },
+  { id: 'cadmiumgeel', name: 'Cadmiumgeel', hex: '#f0b400' },
+  { id: 'cadmiumrood', name: 'Cadmiumrood', hex: '#e03c1f' },
+  { id: 'alizarine', name: 'Alizarine karmozijn', hex: '#7a1f3d' },
+  { id: 'siennagebrand', name: 'Sienna gebrand', hex: '#7e3b17' },
+  { id: 'ombergebrand', name: 'Omber gebrand', hex: '#4e3220' },
+  { id: 'omberruw', name: 'Omber ruw', hex: '#6b5836' },
+  { id: 'ultramarijn', name: 'Ultramarijn', hex: '#2e3e8f' },
+  { id: 'phtaloblauw', name: 'Phtaloblauw', hex: '#0c2c55' },
+  { id: 'viridiaan', name: 'Viridiaan', hex: '#2e6f5a' },
+];
+function defaultPaints() {
+  return DEFAULT_PAINTS.map(p => ({ ...p, ...hexToRgb(p.hex), enabled: true, custom: false }));
+}
+
+// mode: 'gray' | 'values' | 'notan' | 'temp' (warm-koud) | 'chroma' (verzadiging)
 // isolate: -1 uit, anders toont alleen de waardeband rond stap 1..9
 function reduceValues(srcCv, { mode, levels = 4, threshold = 128, blur = 0, isolate = -1 }) {
   const w = srcCv.width, h = srcCv.height;
@@ -460,6 +517,13 @@ function reduceValues(srcCv, { mode, levels = 4, threshold = 128, blur = 0, isol
       r = clamp(lum + dev * 85 + 18, 0, 255);
       gg = clamp(lum * 0.92, 0, 255);
       b = clamp(lum - dev * 85 + 18, 0, 255);
+    } else if (mode === 'chroma') {
+      // verzadiging als heatmap: donker = neutraal, warm-geel = hoog chroma
+      const lab = rgbToLab(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]);
+      const t = clamp(Math.hypot(lab.a, lab.b) / 110, 0, 1);
+      r = clamp(32 + t * 223, 0, 255);
+      gg = clamp(36 + t * 174, 0, 255);
+      b = clamp(44 + t * 36, 0, 255);
     } else if (mode === 'color') {
       r = d[i * 4]; gg = d[i * 4 + 1]; b = d[i * 4 + 2];
     } else {
@@ -573,23 +637,8 @@ function downloadFile(filename, data, mime) {
 /* ---------- verf mengen: enkelvoudige Kubelka-Munk-benadering ----------
    Subtractieve menging per kanaal via K/S = (1-R)²/2R. Een benadering —
    echte pigmenten verschillen — maar geel+blauw wordt hiermee wél groen,
-   waar RGB-middeling grijs zou opleveren.                                 */
-const PAINTS = [
-  { id: 'titaanwit', name: 'Titaanwit', hex: '#f6f3ea' },
-  { id: 'ivoorzwart', name: 'Ivoorzwart', hex: '#221f1e' },
-  { id: 'geleoker', name: 'Gele oker', hex: '#be8a33' },
-  { id: 'cadmiumgeel', name: 'Cadmiumgeel', hex: '#f0b400' },
-  { id: 'cadmiumrood', name: 'Cadmiumrood', hex: '#e03c1f' },
-  { id: 'alizarine', name: 'Alizarine karmozijn', hex: '#7a1f3d' },
-  { id: 'siennagebrand', name: 'Sienna gebrand', hex: '#7e3b17' },
-  { id: 'ombergebrand', name: 'Omber gebrand', hex: '#4e3220' },
-  { id: 'omberruw', name: 'Omber ruw', hex: '#6b5836' },
-  { id: 'ultramarijn', name: 'Ultramarijn', hex: '#2e3e8f' },
-  { id: 'phtaloblauw', name: 'Phtaloblauw', hex: '#0c2c55' },
-  { id: 'viridiaan', name: 'Viridiaan', hex: '#2e6f5a' },
-];
-PAINTS.forEach(p => Object.assign(p, hexToRgb(p.hex)));
-
+   waar RGB-middeling grijs zou opleveren. Werkt met een instelbaar palet
+   (zie defaultPaints / DEFAULT_PAINTS).                                    */
 function linearToSrgb(v) {
   v = clamp(v, 0, 1);
   return Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055));

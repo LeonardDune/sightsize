@@ -67,15 +67,15 @@ Legenda: ✅ gebouwd · 🔜 volgende ronde · ⬜ open idee · 💡 optioneel/l
 
 ---
 
-## ⬜ Open ideeën — kleur & waarde
-- ⬜ Pipet toont meerdere kleurmodellen (naast hex/waarde ook HSL, LAB, evt. CMYK)
-- ⬜ **Chroma-/verzadigingskaart** — waar zit de hoogste verzadiging (valkuil: bonte schaduwen)
-- ⬜ **Dynamisch bereik / luminantiehistogram** — donkerste/lichtste noot, high- vs low-key
+## Kleur & waarde
+- ✅ Pipet toont meerdere kleurmodellen (hex/waarde + RGB + HSL + LAB)
+- ✅ **Chroma-/verzadigingskaart** — heatmap van de verzadiging als referentie-weergave
+- ✅ **Dynamisch bereik / luminantiehistogram** — histogram + donkerste/lichtste stap + high/low-key
 - ⬜ **Gamut-plot** (Gurney-gamutmasking) op een kleurenwiel — welk beperkt gamut de referentie gebruikt
 - ⬜ **Witbalans-correctie** via een neutraal punt — anders sample je de camerazweem mee
 
-## ⬜ Open ideeën — verf mengen
-- ⬜ **Instelbaar eigen vervenpalet** (eigen verf sampelen/toevoegen; verven aan/uit) → rekent met jóuw verfdoos
+## Verf mengen
+- ✅ **Instelbaar eigen vervenpalet** (verfdoos): verven aan/uit, eigen verf toevoegen (incl. pipet-kleur), terugzetten
 - 💡 Optioneel **Mixbox** als externe, geattribueerde bibliotheek voor accurater pigmentgedrag
 - ⬜ Mengrecept bewaren bij een kleurnotitie
 

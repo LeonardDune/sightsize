@@ -105,6 +105,7 @@ function newSession() {
     drawing: newDrawing(),
     drawingVersions: [],
     notes: [],
+    paints: defaultPaints(),
   };
   App.goSource('ref');
 }
@@ -404,7 +405,7 @@ async function saveSession() {
   const rec = {
     id: s.id, name: s.name, updated: Date.now(), thumb: t.toDataURL('image/jpeg', 0.7),
     settings: s.settings, guides: s.guides, active: s.active,
-    drawing: s.drawing, drawingVersions: s.drawingVersions, notes: s.notes,
+    drawing: s.drawing, drawingVersions: s.drawingVersions, notes: s.notes, paints: s.paints,
     ref: packItem(s.ref), sketches: s.sketches.map(packItem),
   };
   try {
@@ -438,6 +439,7 @@ async function openSession(id) {
       drawingVersions: (rec.drawingVersions || []).map(v =>
         v.drawing ? v : { label: v.label, created: v.created, drawing: normalizeDrawing({ strokes: v.strokes }) }),
       notes: rec.notes || [],
+      paints: (rec.paints && rec.paints.length) ? rec.paints : defaultPaints(),
       ref: await unpackItem(rec.ref),
       sketches: [],
     };

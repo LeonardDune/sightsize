@@ -52,6 +52,7 @@ function enterOverlay() {
   V.palette = null;
   renderPaletteRow();
   renderNotesRow();
+  renderPaintList();
   renderLayerList();
   $('#mix-results').innerHTML = '';
   $('#btn-snap').classList.toggle('on', settings().drawSnap);
@@ -505,7 +506,10 @@ function sampleInfoHtml(c, skC) {
   const lab = rgbToLab(c.r, c.g, c.b);
   const hsl = rgbToHsl(c.r, c.g, c.b);
   const step = valueStep(c.r, c.g, c.b);
-  let html = `<b>${rgbToHex(c.r, c.g, c.b)}</b> · waarde <b>${step}/9</b> (L* ${fmt(lab.L, 0)}) · ${fmt(hsl.h, 0)}° ${fmt(hsl.s * 100, 0)}%`;
+  let html = `<b>${rgbToHex(c.r, c.g, c.b)}</b> · waarde <b>${step}/9</b>`
+    + `<br><span class="num">rgb ${c.r},${c.g},${c.b}</span>`
+    + `<br><span class="num">hsl ${fmt(hsl.h, 0)}° ${fmt(hsl.s * 100, 0)}% ${fmt(hsl.l * 100, 0)}%</span>`
+    + `<br><span class="num">lab ${fmt(lab.L, 0)} ${fmt(lab.a, 0)} ${fmt(lab.b, 0)}</span>`;
   if (skC) {
     const skStep = valueStep(skC.r, skC.g, skC.b);
     const d = skStep - step;
@@ -649,7 +653,9 @@ function computeMix() {
   const target = currentTargetColor();
   const box = $('#mix-results');
   if (!target) { box.innerHTML = '<div class="muted">Sample eerst een kleur (of kies een notitie).</div>'; return; }
-  const mixes = suggestMixes(target, PAINTS, 3);
+  const paints = activePaints();
+  if (paints.length < 1) { box.innerHTML = '<div class="muted">Zet minstens één verf aan in de verfdoos.</div>'; return; }
+  const mixes = suggestMixes(target, paints, 3);
   box.innerHTML = '';
   for (const m of mixes) {
     const el = document.createElement('div');
@@ -1299,12 +1305,106 @@ function updateRefRows() {
   $('#row-threshold').hidden = mode !== 'notan';
   $('#row-blur').hidden = mode === 'color' || mode === 'gray';
   $('#levels-out').textContent = st.refLevels;
-  // waarde isoleren: zinvol op kleur/grijs/waarden, niet op notan of temperatuur
-  $('#row-isolate').hidden = mode === 'notan' || mode === 'temp';
+  // waarde isoleren: zinvol op kleur/grijs/waarden, niet op notan/temp/chroma
+  $('#row-isolate').hidden = mode === 'notan' || mode === 'temp' || mode === 'chroma';
   $$('#valscale span').forEach(s => s.classList.toggle('sel', +s.dataset.v === st.refIsolate));
   $('#btn-isolate-off').style.opacity = st.refIsolate > 0 ? '1' : '0.5';
   $('#row-blockin-detail').hidden = !st.blockinValues && !st.blockinContours;
-  $('#temp-legend').hidden = !(mode === 'temp' && st.showRef);
+  updateMapLegend();
+}
+
+// legenda voor de temperatuur- en chroma-kaart
+function updateMapLegend() {
+  const st = settings();
+  const leg = $('#map-legend');
+  const show = st.showRef && (st.refMode === 'temp' || st.refMode === 'chroma');
+  leg.hidden = !show;
+  if (!show) return;
+  if (st.refMode === 'temp') {
+    $('#ml-lo').textContent = 'koel'; $('#ml-hi').textContent = 'warm';
+    $('#ml-bar').style.background = 'linear-gradient(90deg, #5aa9ff, #d9d4c8, #ff7a4d)';
+  } else {
+    $('#ml-lo').textContent = 'neutraal'; $('#ml-hi').textContent = 'verzadigd';
+    $('#ml-bar').style.background = 'linear-gradient(90deg, #20242c, #ffd24d)';
+  }
+}
+
+/* ---------- dynamisch bereik / histogram ---------- */
+function computeRange() {
+  const r = luminanceHistogram(refItem().canvas);
+  if (!r) return;
+  const cv = $('#histogram');
+  cv.hidden = false;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth || 240, h = 60;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  let max = 0;
+  for (const v of r.hist) if (v > max) max = v;
+  const bw = w / r.bins;
+  for (let i = 0; i < r.bins; i++) {
+    const bh = max ? (r.hist[i] / max) * (h - 4) : 0;
+    const g = Math.round(i / (r.bins - 1) * 255);
+    ctx.fillStyle = `rgb(${g},${g},${g})`;
+    ctx.fillRect(i * bw, h - bh, Math.max(1, bw - 0.5), bh);
+  }
+  const info = $('#range-info');
+  info.hidden = false;
+  info.innerHTML = `Bereik: waarde <b>${r.minStep}</b> t/m <b>${r.maxStep}</b> `
+    + `(${r.range} van 9 stappen) · <b>${r.key}</b>`
+    + `<br>Tip: een schilderij haalt zelden 9 waarden — comprimeer bewust.`;
+}
+
+/* ---------- verfdoos ---------- */
+function activePaints() {
+  return session().paints.filter(p => p.enabled);
+}
+
+function renderPaintList() {
+  const box = $('#paint-list');
+  if (!box) return;
+  box.innerHTML = '';
+  session().paints.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'paint-row' + (p.enabled ? '' : ' off');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = p.enabled;
+    cb.addEventListener('change', () => { p.enabled = cb.checked; row.classList.toggle('off', !cb.checked); });
+    const sw = document.createElement('span');
+    sw.className = 'sw';
+    sw.style.background = p.hex;
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = p.name;
+    row.append(cb, sw, nm);
+    if (p.custom) {
+      const del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '🗑';
+      del.title = 'Verwijderen';
+      del.addEventListener('click', () => { session().paints.splice(i, 1); renderPaintList(); });
+      row.append(del);
+    }
+    box.appendChild(row);
+  });
+}
+
+function addPaint() {
+  const suggested = V.sample && V.sample.ref ? rgbToHex(V.sample.ref.r, V.sample.ref.g, V.sample.ref.b) : '#888888';
+  const name = prompt('Naam van de verf:', 'Eigen verf');
+  if (name === null) return;
+  const hex = prompt('Kleur (hex, bijv. #a06b40) — leeg = laatste pipet-sample:', suggested);
+  if (hex === null) return;
+  const clean = /^#?[0-9a-f]{6}$/i.test(hex.trim()) ? (hex.trim().startsWith('#') ? hex.trim() : '#' + hex.trim()) : suggested;
+  session().paints.push({
+    id: 'eigen-' + Date.now(), name: name.trim() || 'Eigen verf',
+    hex: clean, ...hexToRgb(clean), enabled: true, custom: true,
+  });
+  renderPaintList();
+  toast('Verf toegevoegd ✓');
 }
 
 function updateVersionSelect() {
@@ -1426,6 +1526,15 @@ function wireOverlay() {
   $$('[data-export]').forEach(b => b.addEventListener('click', () => exportColors(b.dataset.export)));
   bind('#set-mixtarget', 'change', e => { settings().mixTarget = e.target.value; });
   bind('#btn-mix', 'click', computeMix);
+  bind('#btn-range', 'click', computeRange);
+  bind('#btn-paint-add', 'click', addPaint);
+  bind('#btn-paint-reset', 'click', () => {
+    if (confirm('Verfdoos terugzetten naar de standaard twaalf?')) {
+      session().paints = defaultPaints();
+      renderPaintList();
+      toast('Verfdoos hersteld');
+    }
+  });
   bind('#set-drawversion', 'change', e => {
     if (e.target.value === '') return;
     const v = session().drawingVersions[+e.target.value];

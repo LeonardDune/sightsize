@@ -173,14 +173,28 @@ input:disabled { opacity: 0.45; }
 .dims-inputs label { flex: 1; }
 
 /* ---- canvasschermen ---- */
-#temp-legend {
+#map-legend {
   position: absolute;
   right: 10px; bottom: 10px;
   display: flex; align-items: center; gap: 7px;
   background: #0c0e12d9; border: 1px solid #0009; border-radius: 9px;
   padding: 6px 9px; font-size: 11px; color: var(--fg); z-index: 8; pointer-events: none;
 }
-#temp-legend .bar { width: 72px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #5aa9ff, #d9d4c8, #ff7a4d); }
+#map-legend .bar { width: 72px; height: 8px; border-radius: 4px; }
+
+/* dynamisch bereik */
+#histogram { width: 100%; height: 60px; background: var(--bg2); border: 1px solid var(--line, #2c313a); border-radius: 8px; margin-bottom: 8px; }
+.range-info { font-size: 12.5px; line-height: 1.5; color: var(--muted); margin-bottom: 8px; }
+.range-info b { color: var(--fg); }
+
+/* verfdoos */
+.paint-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 9px; max-height: 168px; overflow-y: auto; }
+.paint-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 3px 2px; }
+.paint-row .sw { width: 20px; height: 20px; border-radius: 5px; border: 1px solid #ffffff2a; flex: 0 0 auto; }
+.paint-row .nm { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.paint-row.off { opacity: 0.4; }
+.paint-row input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+.paint-row .del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; }
 
 #corner-canvas, #view-canvas {
   position: absolute;

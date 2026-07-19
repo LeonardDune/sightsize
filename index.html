@@ -94,7 +94,7 @@
     <div class="hint" id="view-hint"></div>
     <div class="canvas-wrap">
       <canvas id="view-canvas"></canvas>
-      <div id="temp-legend" hidden><span>koel</span><span class="bar"></span><span>warm</span></div>
+      <div id="map-legend" hidden><span id="ml-lo"></span><span class="bar" id="ml-bar"></span><span id="ml-hi"></span></div>
       <div class="panel layer-panel" id="layer-panel" hidden>
         <div class="layer-head">
           <span>Tekenlagen</span>
@@ -113,6 +113,7 @@
               <option value="values">Waarden (block-in)</option>
               <option value="notan">Notan</option>
               <option value="temp">Kleurtemperatuur</option>
+              <option value="chroma">Verzadiging (chroma)</option>
             </select>
           </label>
           <label class="row" id="row-levels" hidden>Aantal waarden <input id="set-levels" type="range" min="2" max="8" step="1"><span class="out" id="levels-out"></span></label>
@@ -123,6 +124,13 @@
             <div class="valscale" id="valscale"></div>
             <div class="row btns"><button id="btn-isolate-off">Alle waarden tonen</button></div>
           </div>
+        </div>
+
+        <div class="ctx" data-modes="pan">
+          <h3>Dynamisch bereik</h3>
+          <div class="row btns"><button id="btn-range">📊 Analyseer</button></div>
+          <canvas id="histogram" width="240" height="60" hidden></canvas>
+          <div id="range-info" class="range-info" hidden></div>
         </div>
 
         <div class="ctx" data-modes="pan">
@@ -166,6 +174,12 @@
           <div class="row btns" id="palette-export" hidden>
             <button data-export="palette-gpl">⬇ .gpl</button>
             <button data-export="palette-ase">⬇ .ase</button>
+          </div>
+          <h3>Kleur — verfdoos</h3>
+          <div id="paint-list" class="paint-list"></div>
+          <div class="row btns">
+            <button id="btn-paint-add">＋ Eigen verf</button>
+            <button id="btn-paint-reset">Standaard</button>
           </div>
           <h3>Kleur — mengsuggestie</h3>
           <label class="row">Doelkleur
