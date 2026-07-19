@@ -164,7 +164,7 @@ function renderScene() {
   const ov = visibilityOverride();
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = '#0c0d10';
+  ctx.fillStyle = Theme.canvasBg;
   ctx.fillRect(0, 0, V.cv.width, V.cv.height);
   ctx.translate(V.view.tx, V.view.ty);
   ctx.scale(V.view.s, V.view.s);
@@ -175,7 +175,7 @@ function renderScene() {
   if (st.showRef) {
     ctx.drawImage(refView(), 0, 0);
   } else {
-    ctx.fillStyle = '#ece8dd';
+    ctx.fillStyle = Theme.paper;
     ctx.fillRect(0, 0, ref.canvas.width, ref.canvas.height);
   }
   ctx.globalAlpha = 1;
@@ -333,13 +333,13 @@ function drawLoupe(ctx, world) {
   ctx.arc(lx, ly, rad, 0, Math.PI * 2);
   ctx.clip();
   // achtergrond: referentie of papier
-  ctx.fillStyle = '#0c0d10';
+  ctx.fillStyle = Theme.canvasBg;
   ctx.fillRect(lx - rad, ly - rad, rad * 2, rad * 2);
   if (settings().showRef) {
     ctx.drawImage(refView(), world.x - half, world.y - half, half * 2, half * 2,
       lx - rad, ly - rad, rad * 2, rad * 2);
   } else {
-    ctx.fillStyle = '#ece8dd';
+    ctx.fillStyle = Theme.paper;
     ctx.fillRect(lx - rad, ly - rad, rad * 2, rad * 2);
   }
   // zichtbare tekenlijnen mee in de loep

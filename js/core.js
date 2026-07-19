@@ -5,6 +5,29 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+// themakleuren die ook in canvas-tekeningen nodig zijn
+const Theme = { canvasBg: '#0c0d10', paper: '#ece8dd' };
+function refreshTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  Theme.canvasBg = (cs.getPropertyValue('--canvas-bg') || '#0c0d10').trim();
+  Theme.paper = (cs.getPropertyValue('--paper') || '#ece8dd').trim();
+}
+function applyTheme(mode) {
+  // mode: 'dark' | 'light' | 'auto'
+  const root = document.documentElement;
+  if (mode === 'auto') root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', mode);
+  try { localStorage.setItem('sightsize-theme', mode); } catch {}
+  refreshTheme();
+}
+function initTheme() {
+  let mode = 'auto';
+  try { mode = localStorage.getItem('sightsize-theme') || 'auto'; } catch {}
+  if (mode !== 'auto') document.documentElement.setAttribute('data-theme', mode);
+  refreshTheme();
+  return mode;
+}
+
 function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function distToSeg(p, a, b) {

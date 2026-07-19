@@ -211,7 +211,7 @@ const Editor = {
     const ctx = this.ctx;
     const img = App.pending.srcCanvas;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#0c0d10';
+    ctx.fillStyle = Theme.canvasBg;
     ctx.fillRect(0, 0, f.r.width, f.r.height);
     ctx.drawImage(img, f.ox, f.oy, img.width * f.s, img.height * f.s);
 
@@ -258,7 +258,7 @@ const Editor = {
       ctx.beginPath();
       ctx.arc(lx, ly, rad, 0, Math.PI * 2);
       ctx.clip();
-      ctx.fillStyle = '#0c0d10';
+      ctx.fillStyle = Theme.canvasBg;
       ctx.fillRect(lx - rad, ly - rad, rad * 2, rad * 2);
       ctx.drawImage(img, cx - half, cy - half, half * 2, half * 2, lx - rad, ly - rad, rad * 2, rad * 2);
       ctx.strokeStyle = '#4da3ff';
@@ -502,6 +502,28 @@ async function renderSessionList() {
 
 /* ---------- bedrading ---------- */
 document.addEventListener('DOMContentLoaded', () => {
+  // thema: dark / light / auto (OS-voorkeur)
+  let themeMode = initTheme();
+  const THEME_ICON = { auto: '🌗', light: '☀️', dark: '🌙' };
+  const THEME_LABEL = { auto: 'Thema: automatisch (volgt systeem)', light: 'Thema: licht', dark: 'Thema: donker' };
+  const refreshThemeBtn = () => {
+    $('#btn-theme').textContent = THEME_ICON[themeMode];
+    $('#btn-theme').title = THEME_LABEL[themeMode];
+  };
+  refreshThemeBtn();
+  $('#btn-theme').addEventListener('click', () => {
+    themeMode = themeMode === 'auto' ? 'light' : themeMode === 'light' ? 'dark' : 'auto';
+    applyTheme(themeMode);
+    refreshThemeBtn();
+    if (App.phase === 'overlay' && typeof requestRender === 'function') requestRender();
+    if (App.phase === 'corners') Editor.draw();
+  });
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (themeMode === 'auto') { refreshTheme(); if (App.phase === 'overlay') requestRender(); }
+    });
+  }
+
   $('#btn-new').addEventListener('click', newSession);
   $('#btn-back').addEventListener('click', () => App.back());
   $('#btn-save').addEventListener('click', saveSession);
