@@ -54,6 +54,24 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+/* line-iconen: één consistente stijl, schalen mee met de context */
+.ico { width: 20px; height: 20px; display: block; }
+.icon-btn { display: inline-grid; place-items: center; }
+.icon-btn .ico { width: 19px; height: 19px; }
+.tabbar .mode .ic { display: flex; }
+.tabbar .mode .ic .ico { width: 22px; height: 22px; }
+.bar button .ico { width: 19px; height: 19px; }
+.fab .ico { width: 22px; height: 22px; }
+.layer-strip .eye { display: inline-flex; }
+.layer-strip .eye .ico { width: 15px; height: 15px; }
+.layer-row .handle .ico, .layer-row .vis .ico, .layer-row .del .ico { width: 16px; height: 16px; }
+.paint-row .del .ico { width: 15px; height: 15px; }
+.session-list button .ico { width: 17px; height: 17px; }
+/* tekst + icoon-knoppen: flex met gap zodat de afstand klopt */
+.btn-ico { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn-ico > span[data-icon] { display: inline-flex; }
+.btn-ico .ico { width: 16px; height: 16px; }
+
 html, body {
   margin: 0;
   height: 100%;

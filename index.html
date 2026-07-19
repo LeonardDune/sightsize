@@ -12,10 +12,10 @@
 <body>
 
 <header id="hdr">
-  <button id="btn-back" class="icon-btn" hidden>←</button>
+  <button id="btn-back" class="icon-btn" data-icon="back" hidden></button>
   <h1 id="hdr-title">SightSize</h1>
-  <button id="btn-theme" class="icon-btn" title="Licht/donker thema">🌗</button>
-  <button id="btn-save" class="icon-btn" hidden title="Sessie opslaan">💾 Opslaan</button>
+  <button id="btn-theme" class="icon-btn" data-icon="theme" title="Licht/donker thema"></button>
+  <button id="btn-save" class="icon-btn btn-ico" hidden title="Sessie opslaan"><span data-icon="save"></span>Opslaan</button>
 </header>
 
 <main>
@@ -23,7 +23,7 @@
   <!-- Startscherm -->
   <section id="scr-start" class="screen">
     <p class="intro">Controleer hoe nauwkeurig je blockin-schets is ten opzichte van je referentie, op sight-size schaal. Upload een referentie en een foto van je schets, en vergelijk ze als overlay.</p>
-    <button id="btn-new" class="primary big">＋ Nieuwe sessie</button>
+    <button id="btn-new" class="primary big btn-ico"><span data-icon="plus"></span>Nieuwe sessie</button>
     <h2>Opgeslagen sessies</h2>
     <ul id="session-list" class="session-list"></ul>
     <p id="no-sessions" class="muted">Nog geen opgeslagen sessies.</p>
@@ -46,7 +46,7 @@
         <span class="card-sub" id="sub-photo"></span>
       </label>
     </div>
-    <label class="file-btn">📷 Kies afbeelding<input id="file-input" type="file" accept="image/*" hidden></label>
+    <label class="file-btn btn-ico"><span data-icon="camera"></span>Kies afbeelding<input id="file-input" type="file" accept="image/*" hidden></label>
   </section>
 
   <!-- Hoekpunten aanwijzen -->
@@ -54,7 +54,7 @@
     <div class="hint" id="corner-hint">Sleep de vier hoekpunten precies naar de hoeken van het vlak.</div>
     <div class="canvas-wrap"><canvas id="corner-canvas"></canvas></div>
     <div class="bar main">
-      <button id="btn-detect">🔍 Detecteer</button>
+      <button id="btn-detect" class="btn-ico"><span data-icon="pan"></span>Detecteer</button>
       <button id="btn-corners-reset">Reset</button>
       <button id="btn-corners-next" class="primary">Verder →</button>
     </div>
@@ -88,10 +88,10 @@
   <section id="scr-overlay" class="screen full" hidden>
     <div class="layer-strip" id="layer-strip">
       <span class="lbl">Lagen</span>
-      <button class="lchip" data-layer="ref"><span class="eye">👁</span>Foto</button>
-      <button class="lchip" data-layer="blockin"><span class="eye">👁</span>Auto-lijnen</button>
-      <button class="lchip" data-layer="drawing"><span class="eye">👁</span>Tekening</button>
-      <button class="lchip" data-layer="sketch"><span class="eye">👁</span>Schets</button>
+      <button class="lchip" data-layer="ref"><span class="eye"></span>Foto</button>
+      <button class="lchip" data-layer="blockin"><span class="eye"></span>Auto-lijnen</button>
+      <button class="lchip" data-layer="drawing"><span class="eye"></span>Tekening</button>
+      <button class="lchip" data-layer="sketch"><span class="eye"></span>Schets</button>
     </div>
     <div class="hint" id="view-hint"></div>
     <div class="canvas-wrap">
@@ -100,7 +100,7 @@
       <div class="panel layer-panel" id="layer-panel" hidden>
         <div class="layer-head">
           <span>Tekenlagen</span>
-          <button id="btn-layer-add" title="Nieuwe laag">＋</button>
+          <button id="btn-layer-add" data-icon="plus" title="Nieuwe laag"></button>
         </div>
         <div id="layer-list" class="layer-list"></div>
       </div>
@@ -132,7 +132,7 @@
 
         <div class="ctx" data-modes="pan">
           <h3>Dynamisch bereik</h3>
-          <div class="row btns"><button id="btn-range">📊 Analyseer</button></div>
+          <div class="row btns"><button id="btn-range" class="btn-ico"><span data-icon="chart"></span>Analyseer</button></div>
           <canvas id="histogram" width="240" height="60" hidden></canvas>
           <div id="range-info" class="range-info" hidden></div>
         </div>
@@ -168,21 +168,21 @@
           <label class="row chk"><input id="set-shownotes" type="checkbox"> Kleurnotities tonen</label>
           <div id="notes-row" class="palette-row"></div>
           <div class="row btns" id="notes-export" hidden>
-            <button data-export="notes-gpl">⬇ .gpl</button>
-            <button data-export="notes-ase">⬇ .ase</button>
+            <button data-export="notes-gpl" class="btn-ico"><span data-icon="download"></span>.gpl</button>
+            <button data-export="notes-ase" class="btn-ico"><span data-icon="download"></span>.ase</button>
           </div>
           <h3>Kleur — palet</h3>
           <label class="row">Aantal kleuren <input id="set-palk" type="range" min="3" max="12" step="1"><span class="out" id="palk-out"></span></label>
-          <div class="row btns"><button id="btn-palette">🎨 Bepaal palet</button></div>
+          <div class="row btns"><button id="btn-palette" class="btn-ico"><span data-icon="palette"></span>Bepaal palet</button></div>
           <div id="palette-row" class="palette-row"></div>
           <div class="row btns" id="palette-export" hidden>
-            <button data-export="palette-gpl">⬇ .gpl</button>
-            <button data-export="palette-ase">⬇ .ase</button>
+            <button data-export="palette-gpl" class="btn-ico"><span data-icon="download"></span>.gpl</button>
+            <button data-export="palette-ase" class="btn-ico"><span data-icon="download"></span>.ase</button>
           </div>
           <h3>Kleur — verfdoos</h3>
           <div id="paint-list" class="paint-list"></div>
           <div class="row btns">
-            <button id="btn-paint-add">＋ Eigen verf</button>
+            <button id="btn-paint-add" class="btn-ico"><span data-icon="plus"></span>Eigen verf</button>
             <button id="btn-paint-reset">Standaard</button>
           </div>
           <h3>Kleur — mengsuggestie</h3>
@@ -192,7 +192,7 @@
               <option value="note">Geselecteerde notitie</option>
             </select>
           </label>
-          <div class="row btns"><button id="btn-mix">🧪 Suggereer mengsel</button></div>
+          <div class="row btns"><button id="btn-mix" class="btn-ico"><span data-icon="flask"></span>Suggereer mengsel</button></div>
           <div id="mix-results" class="mix-results"></div>
         </div>
 
@@ -202,7 +202,7 @@
             <select id="set-drawversion"><option value="">— kies —</option></select>
           </label>
           <div class="row btns">
-            <button id="btn-drawversion-save">💾 Opslaan als versie</button>
+            <button id="btn-drawversion-save" class="btn-ico"><span data-icon="save"></span>Opslaan als versie</button>
           </div>
         </div>
 
@@ -217,8 +217,8 @@
           <label class="row chk"><input id="set-grid" type="checkbox"> Raster</label>
           <label class="row">Rastergrootte <input id="set-gridsize" type="range" min="1" max="10" step="0.5"></label>
           <div class="row btns">
-            <button id="btn-guide-h">＋ Horizontaal</button>
-            <button id="btn-guide-v">＋ Verticaal</button>
+            <button id="btn-guide-h" class="btn-ico"><span data-icon="plus"></span>Horizontaal</button>
+            <button id="btn-guide-v" class="btn-ico"><span data-icon="plus"></span>Verticaal</button>
             <button id="btn-guides-clear">Wis hulplijnen</button>
           </div>
         </div>
@@ -227,57 +227,57 @@
           <h3>Schets</h3>
           <label class="row">Versie <select id="set-version"></select></label>
           <div class="row btns">
-            <button id="btn-new-sketch">＋ Nieuwe schetsfoto</button>
-            <button id="btn-view-reset">Beeld passend</button>
+            <button id="btn-new-sketch" class="btn-ico"><span data-icon="camera"></span>Nieuwe schetsfoto</button>
+            <button id="btn-view-reset" class="btn-ico"><span data-icon="fit"></span>Beeld passend</button>
           </div>
         </div>
         </div><!-- /.sheet-scroll -->
       </div>
 
       <div class="util-cluster" id="util-cluster">
-        <button id="btn-flicker" class="fab" title="Flikkeren aan/uit">⚡</button>
-        <button id="btn-panel" class="fab" title="Instellingen">⚙️</button>
+        <button id="btn-flicker" class="fab" data-icon="flicker" title="Flikkeren aan/uit"></button>
+        <button id="btn-panel" class="fab" data-icon="settings" title="Instellingen"></button>
       </div>
     </div>
 
     <div class="bar tools" id="align-tools" hidden>
       <button id="btn-align-redo">Opnieuw</button>
-      <button id="btn-align-apply" class="primary" disabled>✓ Toepassen</button>
+      <button id="btn-align-apply" class="primary btn-ico" disabled><span data-icon="check"></span>Toepassen</button>
     </div>
 
     <div class="bar tools" id="move-tools" hidden>
-      <button data-nudge="rotl" title="Draai linksom">⟲</button>
-      <button data-nudge="rotr" title="Draai rechtsom">⟳</button>
-      <button data-nudge="smaller" title="Verklein">−</button>
-      <button data-nudge="bigger" title="Vergroot">＋</button>
-      <button id="btn-align-reset">Reset uitlijning</button>
+      <button data-nudge="rotl" data-icon="rotateL" title="Draai linksom"></button>
+      <button data-nudge="rotr" data-icon="rotateR" title="Draai rechtsom"></button>
+      <button data-nudge="smaller" data-icon="minus" title="Verklein"></button>
+      <button data-nudge="bigger" data-icon="plus" title="Vergroot"></button>
+      <button id="btn-align-reset" class="btn-ico"><span data-icon="reset"></span>Reset</button>
     </div>
 
     <div class="bar tools sample-card" id="sample-card" hidden>
       <span class="sw" id="sw-ref" hidden></span>
       <span class="sw" id="sw-sk" hidden></span>
       <span id="sample-info">Tik op de afbeelding om een kleur te sampelen.</span>
-      <button id="btn-pin" hidden title="Vastpinnen als kleurnotitie">📌</button>
-      <button id="btn-note-del" hidden title="Notitie verwijderen">🗑</button>
+      <button id="btn-pin" data-icon="pin" hidden title="Vastpinnen als kleurnotitie"></button>
+      <button id="btn-note-del" data-icon="trash" hidden title="Notitie verwijderen"></button>
     </div>
 
     <div class="bar tools" id="draw-tools" hidden>
       <input id="set-drawcolor" type="color" value="#22c55e" title="Lijnkleur">
       <input id="set-drawwidth" type="range" min="2" max="20" step="1" title="Lijndikte">
-      <button id="btn-snap" title="Uiteinden aan elkaar klikken (snappen)">🧲</button>
-      <button id="btn-edit" title="Eindpunten aanpassen">🎯</button>
-      <button id="btn-eraser" title="Gum: wist hele lijnen">🧽</button>
-      <button id="btn-draw-undo" title="Laatste lijn in laag ongedaan maken">↩</button>
-      <button id="btn-draw-clear" title="Actieve laag wissen">🗑</button>
+      <button id="btn-snap" data-icon="magnet" title="Uiteinden aan elkaar klikken (snappen)"></button>
+      <button id="btn-edit" data-icon="node" title="Eindpunten aanpassen"></button>
+      <button id="btn-eraser" data-icon="eraser" title="Gum: wist hele lijnen"></button>
+      <button id="btn-draw-undo" data-icon="undo" title="Laatste lijn in laag ongedaan maken"></button>
+      <button id="btn-draw-clear" data-icon="trash" title="Actieve laag wissen"></button>
     </div>
 
     <nav class="tabbar" id="mode-bar">
-      <button data-mode="pan" class="mode active"><span class="ic">🖐</span><span class="tl">Bekijken</span></button>
-      <button data-mode="move" class="mode"><span class="ic">✥</span><span class="tl">Schets</span></button>
-      <button data-mode="draw" class="mode"><span class="ic">✏️</span><span class="tl">Tekenen</span></button>
-      <button data-mode="sample" class="mode"><span class="ic">💧</span><span class="tl">Kleur</span></button>
-      <button data-mode="align" class="mode"><span class="ic">⚓</span><span class="tl">Uitlijnen</span></button>
-      <button data-mode="measure" class="mode"><span class="ic">📏</span><span class="tl">Meten</span></button>
+      <button data-mode="pan" class="mode active"><span class="ic" data-icon="pan"></span><span class="tl">Bekijken</span></button>
+      <button data-mode="move" class="mode"><span class="ic" data-icon="move"></span><span class="tl">Schets</span></button>
+      <button data-mode="draw" class="mode"><span class="ic" data-icon="draw"></span><span class="tl">Tekenen</span></button>
+      <button data-mode="sample" class="mode"><span class="ic" data-icon="drop"></span><span class="tl">Kleur</span></button>
+      <button data-mode="align" class="mode"><span class="ic" data-icon="align"></span><span class="tl">Uitlijnen</span></button>
+      <button data-mode="measure" class="mode"><span class="ic" data-icon="ruler"></span><span class="tl">Meten</span></button>
     </nav>
   </section>
 

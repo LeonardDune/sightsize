@@ -487,7 +487,7 @@ async function renderSessionList() {
     open.textContent = 'Open';
     open.addEventListener('click', () => openSession(rec.id));
     const del = document.createElement('button');
-    del.textContent = '🗑';
+    del.innerHTML = svgIcon('trash');
     del.title = 'Verwijderen';
     del.addEventListener('click', async () => {
       if (confirm(`Sessie “${rec.name}” verwijderen?`)) {
@@ -502,6 +502,8 @@ async function renderSessionList() {
 
 /* ---------- bedrading ---------- */
 document.addEventListener('DOMContentLoaded', () => {
+  fillIcons(); // statische emoji-plekhouders vervangen door line-iconen
+
   // thema: dark / light / auto (OS-voorkeur)
   let themeMode = initTheme();
   const THEME_ICON = { auto: '🌗', light: '☀️', dark: '🌙' };

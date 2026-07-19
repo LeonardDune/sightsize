@@ -811,12 +811,12 @@ function renderLayerList() {
     row.className = 'layer-row' + (i === d.active ? ' active' : '');
     const handle = document.createElement('button');
     handle.className = 'handle';
-    handle.textContent = '⠿';
+    handle.innerHTML = svgIcon('grip');
     handle.title = 'Sleep om de volgorde te wijzigen';
     handle.addEventListener('pointerdown', (e) => startLayerDrag(e, layer));
     const vis = document.createElement('button');
     vis.className = 'vis';
-    vis.textContent = layer.visible ? '👁' : '⊘';
+    vis.innerHTML = svgIcon(layer.visible ? 'eye' : 'eyeOff');
     vis.title = layer.visible ? 'Laag verbergen' : 'Laag tonen';
     vis.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -834,7 +834,7 @@ function renderLayerList() {
     });
     const del = document.createElement('button');
     del.className = 'del';
-    del.textContent = '🗑';
+    del.innerHTML = svgIcon('trash');
     del.title = 'Laag verwijderen';
     del.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1270,7 +1270,7 @@ function refreshLayerStrip() {
   for (const chip of $$('#layer-strip .lchip')) {
     const on = map[chip.dataset.layer];
     chip.classList.toggle('off', !on);
-    chip.querySelector('.eye').textContent = on ? '👁' : '⊘';
+    chip.querySelector('.eye').innerHTML = svgIcon(on ? 'eye' : 'eyeOff');
   }
 }
 
@@ -1524,7 +1524,7 @@ function renderPaintList() {
     if (p.custom) {
       const del = document.createElement('button');
       del.className = 'del';
-      del.textContent = '🗑';
+      del.innerHTML = svgIcon('trash');
       del.title = 'Verwijderen';
       del.addEventListener('click', () => { session().paints.splice(i, 1); renderPaintList(); });
       row.append(del);
