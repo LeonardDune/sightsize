@@ -199,8 +199,9 @@ button { font-family: inherit; }
 .session-list .meta { flex: 1; min-width: 0; }
 .session-list .meta .name { font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-list .meta .date { color: var(--muted); font-size: 12.5px; }
-.session-list button { background: var(--bg3); border: none; color: var(--fg); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; }
-.session-list button.open { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.session-list button { background: none; border: 1px solid var(--line); color: var(--fg); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; }
+.session-list button:hover { background: var(--bg3); }
+.session-list button.open { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .version { margin-top: 28px; font-size: 12px; text-align: center; opacity: 0.7; }
 
 /* ---- bronkeuze ---- */
@@ -297,7 +298,7 @@ input:disabled { opacity: 0.45; }
 .bar::-webkit-scrollbar { display: none; }
 .bar button, .bar input { flex: 0 0 auto; }
 .bar button {
-  background: var(--bg3);
+  background: none;
   border: none;
   color: var(--fg);
   border-radius: 9px;
@@ -306,7 +307,10 @@ input:disabled { opacity: 0.45; }
   cursor: pointer;
   touch-action: manipulation;
 }
+.bar button:hover { background: var(--bg3); }
+.bar button:active { background: var(--hover); }
 .bar button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 15px; }
+.bar button.primary:hover { background: var(--accent); filter: brightness(1.06); }
 .bar button:disabled { opacity: 0.4; cursor: default; }
 .bar button.on { background: var(--accent2); color: var(--accent2-ink); }
 .bar input[type="color"] { width: 40px; height: 36px; padding: 0; border: none; background: none; cursor: pointer; }
@@ -420,7 +424,8 @@ input:disabled { opacity: 0.45; }
   padding: 10px;
 }
 .layer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-.layer-head button { background: var(--bg3); border: none; color: var(--fg); border-radius: 7px; width: 28px; height: 28px; font-size: 16px; cursor: pointer; }
+.layer-head button { background: none; border: none; color: var(--fg); border-radius: 7px; width: 28px; height: 28px; cursor: pointer; display: inline-grid; place-items: center; }
+.layer-head button:hover { background: var(--bg3); }
 .layer-list { display: flex; flex-direction: column; gap: 5px; }
 .layer-row {
   display: flex;
@@ -519,14 +524,16 @@ input:disabled { opacity: 0.45; }
 .panel .row.chk input { accent-color: var(--accent); width: 18px; height: 18px; }
 .panel .row.btns { flex-wrap: wrap; justify-content: flex-start; }
 .panel .row.btns button {
-  background: var(--bg3);
-  border: none;
+  background: none;
+  border: 1px solid var(--line);
   color: var(--fg);
   border-radius: 8px;
   padding: 8px 11px;
   font-size: 13px;
   cursor: pointer;
 }
+.panel .row.btns button:hover { background: var(--bg3); }
+.panel .row.btns button:active { background: var(--hover); }
 .panel h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 16px 0 10px; }
 .panel h3:first-child { margin-top: 0; }
 .panel .ctx > h3:first-child { margin-top: 2px; }
