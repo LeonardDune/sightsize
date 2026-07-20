@@ -575,7 +575,9 @@ function updateSampleCard() {
     const n = session().notes[V.selNote];
     swRef.hidden = false;
     swRef.style.background = rgbToHex(n.r, n.g, n.b);
-    info.innerHTML = `Notitie · ${sampleInfoHtml(n, null)}`;
+    let html = `Notitie · ${sampleInfoHtml(n, null)}`;
+    if (n.recipe) html += `<div class="note-recipe"><b>Mengrecept</b>${mixItemHtml(n.recipe, n)}</div>`;
+    info.innerHTML = html;
     del.hidden = false;
   } else if (V.sample && V.sample.ref) {
     swRef.hidden = false;
@@ -676,6 +678,20 @@ function currentTargetColor() {
   return V.sample ? V.sample.ref : null;
 }
 
+function mixItemHtml(m, target) {
+  const recipe = m.paints
+    .slice().sort((a, b) => b.weight - a.weight)
+    .map(p => `<span class="dot" style="background:${p.hex}"></span>${p.name} ${Math.round(p.weight * 100)}%`)
+    .join('<br>');
+  return `<div class="mix-item">
+      <span class="pair">
+        <span class="chip target" style="background:${rgbToHex(target.r, target.g, target.b)}" title="doel"></span>
+        <span class="chip mixed" style="background:${rgbToHex(m.rgb.r, m.rgb.g, m.rgb.b)}" title="mengsel"></span>
+      </span>
+      <span class="recipe">${recipe}<br><span class="de">verhouding ${m.ratio} · ΔE ${fmt(m.dE, 1)}</span></span>
+    </div>`;
+}
+
 function computeMix() {
   const target = currentTargetColor();
   const box = $('#mix-results');
@@ -683,21 +699,47 @@ function computeMix() {
   const paints = activePaints();
   if (paints.length < 1) { box.innerHTML = '<div class="muted">Zet minstens één verf aan in de verfdoos.</div>'; return; }
   const mixes = suggestMixes(target, paints, 3);
-  box.innerHTML = '';
-  for (const m of mixes) {
-    const el = document.createElement('div');
-    el.className = 'mix-item';
-    const recipe = m.paints
-      .slice().sort((a, b) => b.weight - a.weight)
-      .map(p => `<span class="dot" style="background:${p.hex}"></span>${p.name} ${Math.round(p.weight * 100)}%`)
-      .join('<br>');
-    el.innerHTML =
-      `<span class="pair">
-         <span class="chip target" style="background:${rgbToHex(target.r, target.g, target.b)}" title="doel"></span>
-         <span class="chip mixed" style="background:${rgbToHex(m.rgb.r, m.rgb.g, m.rgb.b)}" title="mengsel"></span>
-       </span>
-       <span class="recipe">${recipe}<br><span class="de">verhouding ${m.ratio} · ΔE ${fmt(m.dE, 1)}</span></span>`;
-    box.appendChild(el);
+  box.innerHTML = mixes.map(m => mixItemHtml(m, target)).join('');
+  // beste recept bewaren bij de gekozen kleurnotitie
+  if (settings().mixTarget === 'note' && V.selNote >= 0 && session().notes[V.selNote] && mixes[0]) {
+    session().notes[V.selNote].recipe = mixes[0];
+    updateSampleCard();
+    toast('Mengrecept bewaard bij notitie ✓');
+  }
+}
+
+/* ---------- gamut: kleuren van de referentie op een kleurenwiel ---------- */
+function renderGamut() {
+  const cv = $('#gamut');
+  cv.hidden = false;
+  const pts = gamutPoints(refItem().canvas);
+  const W = cv.width, H = cv.height;
+  const ctx = cv.getContext('2d');
+  const cx = W / 2, cy = H / 2, R = Math.min(cx, cy) - 6;
+  const maxC = 110; // ongeveer de maximale chroma in Lab
+  ctx.clearRect(0, 0, W, H);
+  // neutrale schijf met assen en chroma-ringen
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fillStyle = Theme.canvasBg;
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff30';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
+  ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
+  ctx.stroke();
+  for (const f of [0.33, 0.66, 1]) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * f, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // punten: +a (rood) naar rechts, +b (geel) omhoog; afstand = verzadiging
+  for (const p of pts) {
+    const x = cx + clamp(p.a / maxC, -1, 1) * R;
+    const y = cy - clamp(p.b / maxC, -1, 1) * R;
+    ctx.fillStyle = p.hex;
+    ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
   }
 }
 
@@ -1667,6 +1709,31 @@ function wireOverlay() {
   $$('[data-export]').forEach(b => b.addEventListener('click', () => exportColors(b.dataset.export)));
   bind('#set-mixtarget', 'change', e => { settings().mixTarget = e.target.value; });
   bind('#btn-mix', 'click', computeMix);
+  bind('#btn-wb-set', 'click', () => {
+    if (!V.sample || !V.sample.world) { toast('Sample eerst een neutraal punt'); return; }
+    const it = refItem();
+    const raw = averageArea(it.canvasRaw, V.sample.world.x, V.sample.world.y, settings().sampleRadius);
+    if (!raw) { toast('Kon het punt niet lezen'); return; }
+    it.wb = whiteBalanceGains(raw);
+    applyItemWB(it);
+    V.palette = null; V.rangeMarks = null;
+    renderPaletteRow();
+    doSample(V.sample.world);
+    updateSampleCard();
+    toast('Witbalans ingesteld ✓');
+    requestRender();
+  });
+  bind('#btn-wb-reset', 'click', () => {
+    const it = refItem();
+    it.wb = { r: 1, g: 1, b: 1 };
+    applyItemWB(it);
+    V.palette = null; V.rangeMarks = null;
+    renderPaletteRow();
+    if (V.sample) { doSample(V.sample.world); updateSampleCard(); }
+    toast('Witbalans teruggezet');
+    requestRender();
+  });
+  bind('#btn-gamut', 'click', renderGamut);
   bind('#btn-range', 'click', computeRange);
   $('#histogram').addEventListener('click', isolateFromHistogram);
   bind('#btn-paint-add', 'click', addPaint);

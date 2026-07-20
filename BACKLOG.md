@@ -75,13 +75,13 @@ Legenda: ✅ gebouwd · 🔜 volgende ronde · ⬜ open idee · 💡 optioneel/l
 - ✅ Pipet toont meerdere kleurmodellen (hex/waarde + RGB + HSL + LAB)
 - ✅ **Chroma-/verzadigingskaart** — heatmap van de verzadiging als referentie-weergave
 - ✅ **Dynamisch bereik / luminantiehistogram** — histogram + donkerste/lichtste stap + high/low-key
-- ⬜ **Gamut-plot** (Gurney-gamutmasking) op een kleurenwiel — welk beperkt gamut de referentie gebruikt
-- ⬜ **Witbalans-correctie** via een neutraal punt — anders sample je de camerazweem mee
+- ✅ **Gamut-plot** (Gurney-gamutmasking) op een kleurenwiel — Lab a/b-punten van de referentie, chroma = afstand tot het midden
+- ✅ **Witbalans-correctie** via een neutraal punt — sample een grijs/wit punt als neutraal; per-kanaal-gains op de ongecorrigeerde warp, alle kleur/waarde-analyse volgt automatisch
 
 ## Verf mengen
 - ✅ **Instelbaar eigen vervenpalet** (verfdoos): verven aan/uit, eigen verf toevoegen (incl. pipet-kleur), terugzetten
 - 💡 Optioneel **Mixbox** als externe, geattribueerde bibliotheek voor accurater pigmentgedrag
-- ⬜ Mengrecept bewaren bij een kleurnotitie
+- ✅ Mengrecept bewaren bij een kleurnotitie — kies een notitie als doelkleur, het beste recept wordt op de notitie opgeslagen en getoond (blijft bij de sessie bewaard)
 
 ## ⬜ Open ideeën — vergelijken & voortgang
 - 💡 **Onion-skinning** over schetsversies — je voortgang tijdens één tekening zien

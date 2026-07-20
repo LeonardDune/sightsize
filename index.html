@@ -171,6 +171,15 @@
             <button data-export="notes-gpl" class="btn-ico"><span data-icon="download"></span>.gpl</button>
             <button data-export="notes-ase" class="btn-ico"><span data-icon="download"></span>.ase</button>
           </div>
+          <h3>Kleur — witbalans</h3>
+          <p class="hint-txt">Sample een punt dat neutraal grijs/wit hoort te zijn en zet dat als neutraal — de kleurzweem van de foto wordt gecorrigeerd.</p>
+          <div class="row btns">
+            <button id="btn-wb-set" class="btn-ico"><span data-icon="drop"></span>Sample = neutraal</button>
+            <button id="btn-wb-reset">Reset</button>
+          </div>
+          <h3>Kleur — gamut</h3>
+          <div class="row btns"><button id="btn-gamut" class="btn-ico"><span data-icon="palette"></span>Toon gamut</button></div>
+          <canvas id="gamut" width="220" height="220" hidden></canvas>
           <h3>Kleur — palet</h3>
           <label class="row">Aantal kleuren <input id="set-palk" type="range" min="3" max="12" step="1"><span class="out" id="palk-out"></span></label>
           <div class="row btns"><button id="btn-palette" class="btn-ico"><span data-icon="palette"></span>Bepaal palet</button></div>

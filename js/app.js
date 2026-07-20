@@ -348,17 +348,18 @@ async function processPending() {
   showSpinner('Verwerken…');
   await nextTick();
   try {
-    const canvas = buildOutputCanvas(p.type, p.srcCanvas, p.corners, p.dims);
+    const canvasRaw = buildOutputCanvas(p.type, p.srcCanvas, p.corners, p.dims);
     const item = {
       blob: p.blob, type: p.type, corners: p.corners, dims: p.dims,
-      canvas, derived: null, lines: null,
+      canvasRaw, canvas: canvasRaw, wb: { r: 1, g: 1, b: 1 },
+      derived: null, lines: null,
     };
     if (p.target === 'ref') {
       App.session.ref = item;
       App.pending = null;
       App.goSource('sketch');
     } else {
-      item.transform = fitTransform(canvas, App.session.ref.canvas);
+      item.transform = fitTransform(canvasRaw, App.session.ref.canvas);
       item.label = `Schets ${App.session.sketches.length + 1} · ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`;
       App.session.sketches.push(item);
       App.session.active = App.session.sketches.length - 1;
@@ -375,17 +376,30 @@ function packItem(it) {
   return {
     blob: it.blob, type: it.type, corners: it.corners, dims: it.dims,
     transform: it.transform || null, label: it.label || null,
+    wb: it.wb || null,
   };
 }
 
 async function unpackItem(pk) {
   const srcCanvas = await loadScaledCanvas(pk.blob);
-  const canvas = buildOutputCanvas(pk.type, srcCanvas, pk.corners, pk.dims);
-  return {
+  const canvasRaw = buildOutputCanvas(pk.type, srcCanvas, pk.corners, pk.dims);
+  const item = {
     blob: pk.blob, type: pk.type, corners: pk.corners, dims: pk.dims,
-    canvas, derived: null, lines: null,
+    canvasRaw, canvas: canvasRaw, wb: pk.wb || { r: 1, g: 1, b: 1 },
+    derived: null, lines: null,
     transform: pk.transform || null, label: pk.label || null,
   };
+  applyItemWB(item);
+  return item;
+}
+
+// witbalans (her)toepassen op de referentie en afgeleide caches wissen
+function applyItemWB(item) {
+  item.canvas = applyWhiteBalance(item.canvasRaw, item.wb);
+  item.derived = null;
+  item.gray = null;
+  item.lines = null;
+  item.blockin = null;
 }
 
 async function saveSession() {

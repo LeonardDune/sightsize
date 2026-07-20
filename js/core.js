@@ -805,6 +805,54 @@ function suggestMixes(target, paints, n = 3) {
     }));
 }
 
+/* ---------- witbalans: een gekozen neutraal punt grijs maken ---------- */
+function whiteBalanceGains(rgb) {
+  const lum = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b || 1;
+  return {
+    r: clamp(lum / (rgb.r || 1), 0.4, 2.6),
+    g: clamp(lum / (rgb.g || 1), 0.4, 2.6),
+    b: clamp(lum / (rgb.b || 1), 0.4, 2.6),
+  };
+}
+function applyWhiteBalance(srcCv, g) {
+  if (!g || (Math.abs(g.r - 1) < 1e-3 && Math.abs(g.g - 1) < 1e-3 && Math.abs(g.b - 1) < 1e-3)) return srcCv;
+  const w = srcCv.width, h = srcCv.height;
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const ctx = out.getContext('2d');
+  ctx.drawImage(srcCv, 0, 0);
+  const id = ctx.getImageData(0, 0, w, h);
+  const d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = clamp(d[i] * g.r, 0, 255);
+    d[i + 1] = clamp(d[i + 1] * g.g, 0, 255);
+    d[i + 2] = clamp(d[i + 2] * g.b, 0, 255);
+  }
+  ctx.putImageData(id, 0, 0);
+  return out;
+}
+
+/* ---------- gamut: kleuren van de referentie op een kleurenwiel ---------- */
+function gamutPoints(srcCv, maxPts = 2600) {
+  const maxW = 150;
+  const s = Math.min(1, maxW / srcCv.width);
+  const w = Math.max(2, Math.round(srcCv.width * s));
+  const h = Math.max(2, Math.round(srcCv.height * s));
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  cv.getContext('2d').drawImage(srcCv, 0, 0, w, h);
+  const d = cv.getContext('2d').getImageData(0, 0, w, h).data;
+  const pts = [];
+  const step = Math.max(1, Math.floor((w * h) / maxPts));
+  for (let i = 0; i < w * h; i += step) {
+    if (d[i * 4 + 3] < 128) continue;
+    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
+    const lab = rgbToLab(r, g, b);
+    pts.push({ a: lab.a, b: lab.b, hex: rgbToHex(r, g, b) });
+  }
+  return pts;
+}
+
 /* ---------- kleur sampelen: gemiddelde over een cirkelgebied ---------- */
 function averageArea(canvas, cx, cy, rad) {
   const x0 = Math.floor(cx - rad), y0 = Math.floor(cy - rad);
