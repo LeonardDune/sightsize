@@ -185,6 +185,19 @@ button.big { width: 100%; padding: 14px; font-size: 16px; }
 button { font-family: inherit; }
 
 /* ---- startscherm ---- */
+.sessions-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sessions-head h2 { margin: 0; }
+#btn-import {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+#btn-import:hover { background: var(--bg3); }
+#btn-import .ico { width: 16px; height: 16px; }
 .session-list { list-style: none; margin: 0; padding: 0; }
 .session-list li {
   display: flex;

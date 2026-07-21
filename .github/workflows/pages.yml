@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Buildstempel invullen (cache-busting + zichtbaar versienummer)
-        run: sed -i "s/__BUILD__/${GITHUB_SHA:0:7}/g" index.html
+        run: sed -i "s/__BUILD__/${GITHUB_SHA:0:7}/g" index.html sw.js
       - uses: actions/configure-pages@v5
         with:
           enablement: true

@@ -431,6 +431,78 @@ async function saveSession() {
   }
 }
 
+/* ---------- sessie exporteren en importeren (delen / overzetten) ---------- */
+function blobToDataURL(blob) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = () => rej(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+async function dataURLToBlob(url) {
+  return (await fetch(url)).blob();
+}
+
+// exporteert de opgeslagen sessie (met foto's) als één zelfstandig .json-bestand
+async function exportSession(id) {
+  showSpinner('Exporteren…');
+  await nextTick();
+  try {
+    const rec = await Store.get(id);
+    if (!rec) { toast('Sessie niet gevonden'); return; }
+    const packOut = async (pk) => ({ ...pk, blob: await blobToDataURL(pk.blob) });
+    const out = {
+      format: 'sightsize-session',
+      version: 1,
+      session: {
+        ...rec,
+        ref: await packOut(rec.ref),
+        sketches: await Promise.all(rec.sketches.map(packOut)),
+      },
+    };
+    const base = (rec.name || 'sightsize').replace(/[^\w-]+/g, '_');
+    downloadFile(`${base}.sightsize.json`, JSON.stringify(out), 'application/json');
+    toast('Sessie geëxporteerd ✓');
+  } catch (err) {
+    console.error(err);
+    toast('Export mislukt');
+  } finally {
+    hideSpinner();
+  }
+}
+
+// importeert een geëxporteerd bestand als nieuwe sessie (eigen id, geen overschrijven)
+async function importSessionFile(file) {
+  if (!file) return;
+  showSpinner('Importeren…');
+  await nextTick();
+  try {
+    const data = JSON.parse(await file.text());
+    if (!data || data.format !== 'sightsize-session' || !data.session || !data.session.ref) {
+      toast('Geen geldig SightSize-sessiebestand');
+      return;
+    }
+    const s = data.session;
+    const unpack = async (pk) => ({ ...pk, blob: await dataURLToBlob(pk.blob) });
+    const rec = {
+      ...s,
+      id: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
+      updated: Date.now(),
+      ref: await unpack(s.ref),
+      sketches: await Promise.all((s.sketches || []).map(unpack)),
+    };
+    await Store.put(rec);
+    toast('Sessie geïmporteerd ✓');
+    await renderSessionList();
+  } catch (err) {
+    console.error(err);
+    toast('Kon het bestand niet importeren');
+  } finally {
+    hideSpinner();
+  }
+}
+
 async function openSession(id) {
   showSpinner('Sessie laden…');
   await nextTick();
@@ -500,6 +572,10 @@ async function renderSessionList() {
     open.className = 'open';
     open.textContent = 'Open';
     open.addEventListener('click', () => openSession(rec.id));
+    const exp = document.createElement('button');
+    exp.innerHTML = svgIcon('download');
+    exp.title = 'Exporteren (delen / overzetten)';
+    exp.addEventListener('click', () => exportSession(rec.id));
     const del = document.createElement('button');
     del.innerHTML = svgIcon('trash');
     del.title = 'Verwijderen';
@@ -509,7 +585,7 @@ async function renderSessionList() {
         renderSessionList();
       }
     });
-    li.append(img, meta, open, del);
+    li.append(img, meta, open, exp, del);
     ul.appendChild(li);
   }
 }
@@ -541,6 +617,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   $('#btn-new').addEventListener('click', newSession);
+  $('#btn-import').addEventListener('click', () => $('#import-input').click());
+  $('#import-input').addEventListener('change', e => {
+    importSessionFile(e.target.files[0]);
+    e.target.value = '';
+  });
   $('#btn-back').addEventListener('click', () => App.back());
   $('#btn-save').addEventListener('click', saveSession);
   $('#file-input').addEventListener('change', e => onFileChosen(e.target.files[0]));

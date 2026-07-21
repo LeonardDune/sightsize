@@ -8,6 +8,26 @@
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css?v=__BUILD__">
 <script>try{var m=localStorage.getItem('sightsize-theme');if(m&&m!=='auto')document.documentElement.setAttribute('data-theme',m);}catch(e){}</script>
+<script>
+/* PWA: manifest, iconen en service worker alleen op http(s) toevoegen —
+   onder file:// zou het fetches geven die nergens op slaan. */
+(function () {
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+  var head = document.head;
+  var add = function (tag, attrs) { var el = document.createElement(tag); for (var k in attrs) el[k] = attrs[k]; head.appendChild(el); };
+  add('link', { rel: 'manifest', href: 'manifest.webmanifest' });
+  add('link', { rel: 'apple-touch-icon', href: 'icon-192.png' });
+  add('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
+  add('meta', { name: 'mobile-web-app-capable', content: 'yes' });
+  add('meta', { name: 'apple-mobile-web-app-title', content: 'SightSize' });
+  add('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' });
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+})();
+</script>
 </head>
 <body>
 
@@ -24,9 +44,13 @@
   <section id="scr-start" class="screen">
     <p class="intro">Controleer hoe nauwkeurig je blockin-schets is ten opzichte van je referentie, op sight-size schaal. Upload een referentie en een foto van je schets, en vergelijk ze als overlay.</p>
     <button id="btn-new" class="primary big btn-ico"><span data-icon="plus"></span>Nieuwe sessie</button>
-    <h2>Opgeslagen sessies</h2>
+    <div class="sessions-head">
+      <h2>Opgeslagen sessies</h2>
+      <button id="btn-import" class="btn-ico" title="Een geëxporteerd sessiebestand importeren"><span data-icon="upload"></span>Importeren</button>
+      <input id="import-input" type="file" accept=".json,application/json" hidden>
+    </div>
     <ul id="session-list" class="session-list"></ul>
-    <p id="no-sessions" class="muted">Nog geen opgeslagen sessies.</p>
+    <p id="no-sessions" class="muted">Nog geen opgeslagen sessies. Importeer er een of begin een nieuwe.</p>
     <p class="muted version">Versie __BUILD__</p>
   </section>
 
