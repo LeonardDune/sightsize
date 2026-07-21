@@ -144,6 +144,8 @@ main { flex: 1; position: relative; overflow: hidden; }
   flex-direction: column;
 }
 .screen[hidden] { display: none; }
+/* eerste kop niet dubbel laten inspringen bovenop de schermpadding */
+.screen > h2:first-child { margin-top: 4px; }
 
 .canvas-wrap { position: relative; flex: 1; min-height: 0; }
 
@@ -185,8 +187,9 @@ button.big { width: 100%; padding: 14px; font-size: 16px; }
 button { font-family: inherit; }
 
 /* ---- startscherm ---- */
-.sessions-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sessions-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 30px 0 12px; }
 .sessions-head h2 { margin: 0; }
+#no-sessions { margin: 0; }
 #btn-import {
   background: none;
   border: 1px solid var(--line);
@@ -233,7 +236,10 @@ button { font-family: inherit; }
 .card-sub { display: block; color: var(--muted); font-size: 13px; margin-top: 5px; line-height: 1.45; }
 
 .file-btn {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   text-align: center;
   padding: 14px;
   font-size: 16px;
