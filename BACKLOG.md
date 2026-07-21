@@ -88,9 +88,10 @@ Legenda: ✅ gebouwd · 🔜 volgende ronde · ⬜ open idee · 💡 optioneel/l
 - 💡 Tijdlijn/vergelijk van opeenvolgende schetsfoto's
 
 ## ⬜ Open ideeën — platform
-- 💡 **PWA / "zet op beginscherm"** met manifest + offline (installeerbaar, werkt zonder net)
+- ✅ **PWA / "zet op beginscherm"** — manifest + iconen + service worker; installeerbaar, opent fullscreen, werkt offline (app-shell gecachet, verse cache per deploy)
+- ✅ **Sessie exporteren/importeren** — hele sessie als één `.sightsize.json` (foto's inbegrepen); import als nieuwe sessie. Voor delen en overzetten tussen apparaten
 - 💡 Directe camera-integratie bij de ezel
-- 💡 Sessie exporteren/importeren of delen
+- 💡 **Automatische sync tussen apparaten** — vereist gedeelde opslag + identiteit (eigen clouddrive koppelen, of backend met account); bewuste architectuurkeuze, groter dan de huidige client-side opzet
 
 ---
 
