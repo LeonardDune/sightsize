@@ -119,7 +119,16 @@ async function onFileChosen(file) {
   try {
     const srcCanvas = await loadScaledCanvas(file);
     App.pending = { target: App.pendingTarget, type, blob: file, srcCanvas, corners: null, dims: null };
+    // volgende schetsversie: papier is elke keer hetzelfde formaat — overnemen
+    // van de vorige schets en het formaatscherm overslaan (hoeken blijven nodig)
+    const reuseDims = App.pendingTarget === 'sketch' && App.session.sketches.length > 0;
+    if (reuseDims) {
+      const d = App.session.sketches[App.session.sketches.length - 1].dims || null;
+      App.pending.dims = d;
+      toast(d ? `Zelfde formaat als vorige schets (${fmt(d.w)} × ${fmt(d.h)} cm)` : 'Zelfde formaat als vorige schets');
+    }
     if (type === 'photo') enterCorners();
+    else if (reuseDims) await processPending();
     else enterDims();
   } catch (err) {
     console.error(err);
@@ -276,6 +285,15 @@ const Editor = {
     }
   },
 };
+
+// na de hoekpunten: bij een volgende schetsversie is het formaat al bekend
+function afterCorners() {
+  if (App.pendingTarget === 'sketch' && App.session.sketches.length > 0) {
+    processPending();
+  } else {
+    enterDims();
+  }
+}
 
 async function enterCorners() {
   Editor.init();
@@ -638,7 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
     App.pending.corners = defaultCorners();
     Editor.draw();
   });
-  $('#btn-corners-next').addEventListener('click', enterDims);
+  $('#btn-corners-next').addEventListener('click', afterCorners);
   $('#dims-preset').addEventListener('change', onPresetChange);
   $('#btn-dims-next').addEventListener('click', onDimsNext);
   renderSessionList();
