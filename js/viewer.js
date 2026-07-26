@@ -791,16 +791,60 @@ function snapCandidates(exclude) {
   return out;
 }
 
-// klik een punt vast aan een bestaand lijnuiteinde of vlakhoekpunt binnen grijpafstand
-function snapToEndpoint(w, exclude) {
-  if (!settings().drawSnap) return w;
+// alle randsegmenten om op te snappen: vlakranden en lijnstukken (voor aansluiten)
+function snapSegments(exclude, excludeShape) {
+  const segs = [];
+  for (const layer of drawingLayers()) {
+    if (!layer.visible) continue;
+    if (layer.kind === 'values') {
+      for (const sh of layer.shapes) {
+        if (sh === excludeShape || sh.pts.length < 2) continue;
+        for (let i = 0; i < sh.pts.length; i++) {
+          const a = sh.pts[i], b = sh.pts[(i + 1) % sh.pts.length];
+          if (a === exclude || b === exclude) continue; // eigen aangrenzende rand overslaan
+          segs.push({ a, b });
+        }
+      }
+    } else {
+      for (const s of layer.strokes) {
+        for (let i = 0; i + 1 < s.pts.length; i++) {
+          const a = s.pts[i], b = s.pts[i + 1];
+          if (a === exclude || b === exclude) continue;
+          segs.push({ a, b });
+        }
+      }
+    }
+  }
+  return segs;
+}
+
+// dichtstbijzijnde punt op een lijnstuk
+function closestOnSeg(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-9) return { x: a.x, y: a.y };
+  const t = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / len2, 0, 1);
+  return { x: a.x + t * dx, y: a.y + t * dy };
+}
+
+// klik een punt vast: eerst aan een hoekpunt/uiteinde, anders aan een rand van
+// een ander vlak of lijn (zodat vlakken op elkaars lijn aansluiten)
+function snapToEndpoint(w, exclude, excludeShape) {
+  if (!settings().drawSnap) return { x: w.x, y: w.y };
   const tol = 12 / V.view.s;
   let best = null, bestD = tol;
   for (const p of snapCandidates(exclude)) {
     const d = dist(p, w);
-    if (d < bestD) { bestD = d; best = p; }
+    if (d < bestD) { bestD = d; best = { x: p.x, y: p.y }; }
   }
-  return best ? { x: best.x, y: best.y } : w;
+  if (best) return best; // hoekpunt/uiteinde heeft voorrang
+  let bestE = null, bestED = tol;
+  for (const seg of snapSegments(exclude, excludeShape)) {
+    const q = closestOnSeg(w, seg.a, seg.b);
+    const d = dist(q, w);
+    if (d < bestED) { bestED = d; bestE = q; }
+  }
+  return bestE || { x: w.x, y: w.y };
 }
 
 // dichtstbijzijnde eindpunt van een zichtbare lijn om te verslepen
@@ -992,7 +1036,7 @@ function shapeTap(w) {
   if (V.draw.edit && V.draw.selShape) {
     const ins = hitShapeEdge(worldToScreen(w));
     if (ins) {
-      const p = snapToEndpoint(w);
+      const p = snapToEndpoint(w, null, V.draw.selShape.shape);
       V.draw.selShape.shape.pts.splice(ins.index, 0, { x: p.x, y: p.y });
       V.draw.selShape.shape._lum = null;
       clearRedo();
@@ -1507,7 +1551,7 @@ function onPointerMove(e) {
       if (V.draw.tool === 'shape') {
         if (V.draw.erase) eraseShapeAt(w);
         else if (V.draw.vtx) {
-          const snapped = snapToEndpoint(w, V.draw.vtx.pts[V.draw.vtx.i]);
+          const snapped = snapToEndpoint(w, V.draw.vtx.pts[V.draw.vtx.i], V.draw.vtx.shape);
           V.draw.vtx.pts[V.draw.vtx.i] = { x: snapped.x, y: snapped.y };
           if (V.draw.vtx.shape) V.draw.vtx.shape._lum = null;
         }
