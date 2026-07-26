@@ -40,6 +40,7 @@ const ICONS = {
   chart: '<line x1="4" y1="20" x2="4" y2="4"/><line x1="4" y1="20" x2="20" y2="20"/><rect x="7" y="12" width="2.5" height="5"/><rect x="12" y="8" width="2.5" height="9"/><rect x="17" y="14" width="2.5" height="3"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+  fill: '<polygon points="4 6 14 4 20 12 10 20 4 14" fill="currentColor" stroke="none" opacity="0.35"/><polygon points="4 6 14 4 20 12 10 20 4 14"/>',
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
   fit: '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
   grip: '<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>',
@@ -666,6 +667,68 @@ function rgbToLab(r, g, b) {
 // waardenstap op een 9-staps schaal: 1 = donkerst, 9 = lichtst
 function valueStep(r, g, b) {
   return clamp(1 + Math.round(rgbToLab(r, g, b).L / 100 * 8), 1, 9);
+}
+
+/* ---------- waarden-blockin: eigen waardenvlakken ----------
+   Grijs volgt dezelfde luminantie-posterize als de referentie-modus
+   "waarden", zodat een handmatig vlak 1-op-1 met de software vergelijkbaar
+   is. De bron-waarde per vlak is genormaliseerd (0..1); de weergave wordt
+   niet-destructief afgerond op de dichtstbijzijnde stap van N.            */
+function greyOfStep(i, n) {
+  return n <= 1 ? 128 : Math.round(clamp(i, 0, n - 1) / (n - 1) * 255);
+}
+function stepOfValue(v, n) {
+  return n <= 1 ? 0 : clamp(Math.round(clamp(v, 0, 1) * (n - 1)), 0, n - 1);
+}
+// gemiddelde luminantie (0..1) binnen een polygoon op een canvas
+function averageLuminanceInPolygon(canvas, pts) {
+  if (!pts || pts.length < 3) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  minX = clamp(Math.floor(minX), 0, canvas.width - 1);
+  minY = clamp(Math.floor(minY), 0, canvas.height - 1);
+  maxX = clamp(Math.ceil(maxX), 0, canvas.width);
+  maxY = clamp(Math.ceil(maxY), 0, canvas.height);
+  const bw = maxX - minX, bh = maxY - minY;
+  if (bw < 1 || bh < 1) return null;
+  const d = canvas.getContext('2d').getImageData(minX, minY, bw, bh).data;
+  const stride = Math.max(1, Math.floor(Math.sqrt(bw * bh) / 60));
+  let sum = 0, n = 0;
+  for (let y = 0; y < bh; y += stride) {
+    for (let x = 0; x < bw; x += stride) {
+      if (!pointInPolygon(minX + x + 0.5, minY + y + 0.5, pts)) continue;
+      const i = (y * bw + x) * 4;
+      if (d[i + 3] < 128) continue;
+      sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      n++;
+    }
+  }
+  return n ? (sum / n) / 255 : null;
+}
+function pointInPolygon(x, y, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function polygonCentroid(pts) {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const f = pts[j].x * pts[i].y - pts[i].x * pts[j].y;
+    a += f; cx += (pts[j].x + pts[i].x) * f; cy += (pts[j].y + pts[i].y) * f;
+  }
+  if (Math.abs(a) < 1e-6) {
+    let sx = 0, sy = 0;
+    for (const p of pts) { sx += p.x; sy += p.y; }
+    return { x: sx / pts.length, y: sy / pts.length };
+  }
+  a *= 0.5;
+  return { x: cx / (6 * a), y: cy / (6 * a) };
 }
 
 function rgbToHex(r, g, b) {

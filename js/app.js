@@ -74,23 +74,36 @@ function defaultSettings() {
     showRef: true, showSketch: true, showDrawing: true,
     blockinValues: false, blockinContours: false, blockinDetail: 5,
     drawColor: '#22c55e', drawWidth: 6, drawSnap: true,
+    valueN: 4, showValues: true, valueReveal: false,
     sampleRadius: 8, paletteK: 6, showNotes: true, mixTarget: 'sample',
     flicker: false, flickerMs: 600, grid: false, gridCm: 5,
   };
 }
 
 function newDrawing() {
-  return { layers: [{ name: 'Laag 1', visible: true, strokes: [] }], active: 0 };
+  return { layers: [{ name: 'Laag 1', kind: 'lines', visible: true, strokes: [] }], active: 0 };
 }
 
-// oude platte { strokes } → lagenstructuur; nieuwe structuur blijft ongewijzigd
+// oude platte { strokes } → lagenstructuur; laagtype invullen (lines/values)
+function normalizeLayer(l) {
+  l.kind = l.kind || 'lines';
+  if (l.kind === 'values') {
+    l.shapes = l.shapes || [];
+    if (l.opacity == null) l.opacity = 1;
+    l.shapes.forEach(s => { s._lum = null; if (s.opacity == null) s.opacity = 1; }); // meetcache herberekenen
+  } else {
+    l.strokes = l.strokes || [];
+  }
+  return l;
+}
 function normalizeDrawing(d) {
   if (!d) return newDrawing();
   if (Array.isArray(d.layers) && d.layers.length) {
     d.active = Math.min(Math.max(0, d.active | 0), d.layers.length - 1);
+    d.layers.forEach(normalizeLayer);
     return d;
   }
-  return { layers: [{ name: 'Laag 1', visible: true, strokes: d.strokes || [] }], active: 0 };
+  return { layers: [normalizeLayer({ name: 'Laag 1', kind: 'lines', visible: true, strokes: d.strokes || [] })], active: 0 };
 }
 
 function newSession() {
@@ -418,6 +431,12 @@ function applyItemWB(item) {
   item.gray = null;
   item.lines = null;
   item.blockin = null;
+  // waardenvlakken meten de referentie: hun meetcache is nu verouderd
+  if (App.session && App.session.drawing) {
+    for (const l of App.session.drawing.layers) {
+      if (l.kind === 'values') l.shapes.forEach(s => { s._lum = null; });
+    }
+  }
 }
 
 async function saveSession() {
