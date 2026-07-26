@@ -16,7 +16,7 @@ const V = {
   align: { stage: 0, pts: [] },
   dragKind: null, // 'ref' of 'sketch' tijdens het verslepen van een meet-/ankerpunt
   draw: { erase: false, edit: false, cur: null, editPt: null, editStroke: null,
-          tool: 'line', poly: null, selShape: null, vtx: null, lastVal: 0.5 }, // tekenmodus
+          tool: 'line', poly: null, selShape: null, vtx: null, lastVal: 0.5, redo: [] }, // tekenmodus
   sample: null,   // laatste pipet-meting {world, ref:{r,g,b}, sk:{r,g,b}|null}
   selNote: -1,    // geselecteerde kleurnotitie in pipet-modus
   palette: null,  // {colors, assign, w, h, hi, hiCanvas, hiIdx}
@@ -53,6 +53,9 @@ function enterOverlay() {
   updateDrawVersionSelect();
   V.palette = null;
   V.rangeMarks = null;
+  V.draw.redo = [];
+  V.draw.poly = null;
+  V.draw.selShape = null;
   $('#histogram').hidden = true;
   $('#range-info').hidden = true;
   renderPaletteRow();
@@ -482,7 +485,7 @@ function updateHint() {
   else if (V.mode === 'draw') {
     if (V.draw.tool === 'shape') {
       if (V.draw.erase) html = '<b>Gum</b> — tik op een <b>vlak</b> om het te wissen.';
-      else if (V.draw.edit) html = '<b>Punten aanpassen</b> — selecteer een vlak en sleep een hoekpunt.';
+      else if (V.draw.edit) html = '<b>Punten aanpassen</b> — sleep een hoekpunt; tik op een <b>rand</b> om een punt toe te voegen, tik op een <b>hoekpunt</b> om het te verwijderen.';
       else if (V.draw.poly) html = 'Tik verder voor <b>hoekpunten</b>; tik het <b>beginpunt</b> om het vlak te sluiten.';
       else html = 'Tik <b>hoekpunten</b> voor een gesloten <b>waardenvlak</b> (rechte randen), of tik een vlak om het te selecteren.';
     }
@@ -849,6 +852,7 @@ function eraseAt(w) {
         : s.pts.some((p, j) => j > 0 && distToSeg(w, s.pts[j - 1], p) < s.w / 2 + tol);
       if (hit) {
         strokes.splice(i, 1);
+        clearRedo();
         requestRender();
         return;
       }
@@ -959,7 +963,23 @@ function hitShapeVertex(screenPt) {
   return best;
 }
 
-// een tik in vlak-gereedschap: punt zetten, vlak sluiten of een vlak selecteren
+// dichtstbijzijnde rand van het geselecteerde vlak (voor een tussenpunt), niet vlak bij een hoekpunt
+function hitShapeEdge(screenPt) {
+  if (!V.draw.selShape) return null;
+  const pts = V.draw.selShape.shape.pts;
+  const tol = 12;
+  let best = null, bestD = tol;
+  for (let i = 0; i < pts.length; i++) {
+    const a = worldToScreen(pts[i]);
+    const b = worldToScreen(pts[(i + 1) % pts.length]);
+    if (dist(a, screenPt) < 14 || dist(b, screenPt) < 14) continue; // bij een hoekpunt: geen rand-actie
+    const d = distToSeg(screenPt, a, b);
+    if (d < bestD) { bestD = d; best = { index: i + 1 }; }
+  }
+  return best;
+}
+
+// een tik in vlak-gereedschap: punt zetten, vlak sluiten, tussenpunt toevoegen of een vlak selecteren
 function shapeTap(w) {
   const poly = V.draw.poly;
   if (poly) {
@@ -968,8 +988,23 @@ function shapeTap(w) {
     requestRender();
     return;
   }
+  // aanpasmodus: tik op een rand van het geselecteerde vlak → tussenpunt toevoegen
+  if (V.draw.edit && V.draw.selShape) {
+    const ins = hitShapeEdge(worldToScreen(w));
+    if (ins) {
+      const p = snapToEndpoint(w);
+      V.draw.selShape.shape.pts.splice(ins.index, 0, { x: p.x, y: p.y });
+      V.draw.selShape.shape._lum = null;
+      clearRedo();
+      updateShapeCheck();
+      toast('Punt toegevoegd');
+      requestRender();
+      return;
+    }
+  }
   const hit = hitShape(w);
   if (hit) selectShape(hit);
+  else if (V.draw.edit) selectShape(null); // in aanpasmodus geen nieuw vlak beginnen
   else { V.draw.poly = [snapToEndpoint(w)]; selectShape(null); }
   requestRender();
 }
@@ -978,6 +1013,7 @@ function closePoly() {
   const layer = activeValueLayer();
   const shape = { pts: V.draw.poly.map(p => ({ x: p.x, y: p.y })), v: V.draw.lastVal, opacity: 1, _lum: null };
   layer.shapes.unshift(shape);
+  clearRedo();
   V.draw.poly = null;
   settings().showValues = true;
   refreshLayerStrip();
@@ -1004,6 +1040,7 @@ function eraseShapeAt(w) {
   if (!hit) return;
   const arr = hit.layer.shapes;
   arr.splice(arr.indexOf(hit.shape), 1);
+  clearRedo();
   if (V.draw.selShape && V.draw.selShape.shape === hit.shape) selectShape(null);
   requestRender();
 }
@@ -1018,6 +1055,45 @@ function ensureLayerKind(kind) {
 }
 
 function activeValueLayer() { return ensureLayerKind('values'); }
+
+/* ---------- ongedaan maken / opnieuw (lijnen en vlakken) ---------- */
+function clearRedo() { V.draw.redo = []; }
+
+function drawUndo() {
+  if (V.draw.tool === 'shape') {
+    if (V.draw.poly) { // eerst punten van het vlak-in-wording terugnemen
+      V.draw.poly.pop();
+      if (!V.draw.poly.length) V.draw.poly = null;
+    } else {
+      const l = activeValueLayer();
+      const sh = l.shapes.shift();
+      if (sh) {
+        V.draw.redo.push({ kind: 'shape', layer: l, item: sh });
+        if (V.draw.selShape && V.draw.selShape.shape === sh) selectShape(null);
+      }
+    }
+  } else {
+    const l = ensureLayerKind('lines');
+    const s = l.strokes.pop();
+    if (s) V.draw.redo.push({ kind: 'stroke', layer: l, item: s });
+  }
+  requestRender();
+}
+
+function drawRedo() {
+  const op = V.draw.redo.pop();
+  if (!op) { toast('Niets om opnieuw te doen'); return; }
+  if (op.kind === 'shape') {
+    op.layer.shapes.unshift(op.item);
+    op.item._lum = null;
+    settings().showValues = true;
+    if (V.draw.tool === 'shape') selectShape({ layer: op.layer, shape: op.item });
+  } else {
+    op.layer.strokes.push(op.item);
+  }
+  refreshLayerStrip();
+  requestRender();
+}
 
 function saveDrawingVersion() {
   const s = session();
@@ -1080,6 +1156,7 @@ function renderLayerList() {
       if (nonEmpty && !confirm(`Laag “${layer.name}” verwijderen?`)) return;
       d.layers.splice(i, 1);
       d.active = Math.min(d.active, d.layers.length - 1);
+      clearRedo();
       renderLayerList();
       requestRender();
     });
@@ -1148,6 +1225,7 @@ function addLayer(kind = 'lines') {
   d.layers.unshift(layer);
   d.active = 0;
   if (kind === 'values') settings().showValues = true; else settings().showDrawing = true;
+  clearRedo();
   refreshLayerStrip();
   renderLayerList();
   requestRender();
@@ -1491,6 +1569,7 @@ function onPointerUp(e) {
       // alleen een echt lijnstuk bewaren; een tikje zonder sleep vervalt
       if (dist(V.draw.cur.pts[0], V.draw.cur.pts[1]) > 3 / V.view.s) {
         ensureLayerKind('lines').strokes.push(V.draw.cur);
+        clearRedo();
       }
       V.draw.cur = null;
     }
@@ -1500,8 +1579,17 @@ function onPointerUp(e) {
   }
   if (V.pointers.size === 0 && V.draw.vtx) {
     const sh = V.draw.vtx.shape;
+    const idx = V.draw.vtx.i;
+    const wasTap = g && !g.moved;
     V.draw.vtx = null;
-    if (sh) { sh._lum = null; if (V.draw.selShape && V.draw.selShape.shape === sh) updateShapeCheck(); }
+    if (wasTap && sh && V.draw.edit) {
+      // tik (zonder slepen) op een hoekpunt in aanpasmodus → verwijderen
+      if (sh.pts.length > 3) { sh.pts.splice(idx, 1); sh._lum = null; clearRedo(); updateShapeCheck(); toast('Punt verwijderd'); }
+      else toast('Een vlak heeft minstens 3 punten nodig');
+    } else if (sh) {
+      sh._lum = null;
+      if (V.draw.selShape && V.draw.selShape.shape === sh) updateShapeCheck();
+    }
     requestRender();
   }
   if (g && g.type === 'single' && V.pointers.size === 0) {
@@ -1979,21 +2067,14 @@ function wireOverlay() {
     $('#btn-snap').classList.toggle('on', settings().drawSnap);
     toast(settings().drawSnap ? 'Snappen aan' : 'Snappen uit');
   });
-  bind('#btn-draw-undo', 'click', () => {
-    if (V.draw.tool === 'shape') {
-      if (V.draw.poly) { V.draw.poly.pop(); if (!V.draw.poly.length) V.draw.poly = null; }
-      else { const l = activeValueLayer(); const sh = l.shapes.shift(); if (V.draw.selShape && V.draw.selShape.shape === sh) selectShape(null); }
-    } else {
-      const l = ensureLayerKind('lines'); l.strokes.pop();
-    }
-    requestRender();
-  });
+  bind('#btn-draw-undo', 'click', drawUndo);
+  bind('#btn-draw-redo', 'click', drawRedo);
   bind('#btn-draw-clear', 'click', () => {
     const l = activeLayer();
     if (l.kind === 'values') {
-      if (l.shapes.length && confirm(`Waardenlaag “${l.name}” wissen?`)) { l.shapes = []; selectShape(null); requestRender(); }
+      if (l.shapes.length && confirm(`Waardenlaag “${l.name}” wissen?`)) { l.shapes = []; selectShape(null); clearRedo(); requestRender(); }
     } else if (l.strokes.length && confirm(`Laag “${l.name}” wissen?`)) {
-      l.strokes = []; requestRender();
+      l.strokes = []; clearRedo(); requestRender();
     }
   });
   bind('#btn-layer-add', 'click', () => addLayer('lines'));
@@ -2104,6 +2185,7 @@ function wireOverlay() {
     if (!v) return;
     session().drawing = normalizeDrawing(JSON.parse(JSON.stringify(v.drawing)));
     settings().showDrawing = true;
+    clearRedo();
     selectShape(null);
     refreshLayerStrip();
     renderLayerList();
