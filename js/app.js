@@ -121,8 +121,19 @@ function newSession() {
     drawingVersions: [],
     notes: [],
     paints: defaultPaints(),
+    construction: newConstruction(),
   };
   App.goSource('ref');
+}
+
+// Loomis-kopconstructie (bal + kruis + kin), stand instelbaar met handvatten
+function newConstruction() {
+  return { on: false, cx: 0, cy: 0, r: 0, nx: 0, ny: 0, chinx: 0, chiny: 0,
+    color: '#22d3ee', opacity: 0.9, _init: false };
+}
+function normalizeConstruction(c) {
+  const d = newConstruction();
+  return c ? { ...d, ...c } : d;
 }
 
 /* ---------- bestand gekozen ---------- */
@@ -459,6 +470,7 @@ async function saveSession() {
     id: s.id, name: s.name, updated: Date.now(), thumb: t.toDataURL('image/jpeg', 0.7),
     settings: s.settings, guides: s.guides, active: s.active,
     drawing: s.drawing, drawingVersions: s.drawingVersions, notes: s.notes, paints: s.paints,
+    construction: s.construction,
     ref: packItem(s.ref), sketches: s.sketches.map(packItem),
   };
   try {
@@ -565,6 +577,7 @@ async function openSession(id) {
         v.drawing ? v : { label: v.label, created: v.created, drawing: normalizeDrawing({ strokes: v.strokes }) }),
       notes: rec.notes || [],
       paints: (rec.paints && rec.paints.length) ? rec.paints : defaultPaints(),
+      construction: normalizeConstruction(rec.construction),
       ref: await unpackItem(rec.ref),
       sketches: [],
     };

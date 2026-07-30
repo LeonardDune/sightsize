@@ -84,6 +84,11 @@ Legenda: ✅ gebouwd · 🔜 volgende ronde · ⬜ open idee · 💡 optioneel/l
 - 💡 Optioneel **Mixbox** als externe, geattribueerde bibliotheek voor accurater pigmentgedrag
 - ✅ Mengrecept bewaren bij een kleurnotitie — kies een notitie als doelkleur, het beste recept wordt op de notitie opgeslagen en getoond (blijft bij de sessie bewaard)
 
+## Structuur / constructie
+- ✅ **Loomis-kopconstructie** (handmatig, fase 1): schakelbare overlay met bal + wangvlakken + 3D-kruis (middellijn/brauwlijn), derde-indeling en kaak/kin. Stand instelbaar met handvatten (geel = draaien/kantelen, plus midden/straal/kin), verborgen lijnen gestippeld, kleur/dekking instelbaar, bewaard in de sessie. Geen externe afhankelijkheden.
+- ⬜ **Automatische detectie** (fase 2): gezicht-landmarks/kopstand (bijv. MediaPipe, client-side, lui geladen) om de constructie automatisch voor te plaatsen; blijft daarna bewerkbaar. Portret-only; weegt tegen "geen dependencies / offline".
+- 💡 **Roteerbaar planair vlakkenmodel** (Asaro-achtig, generiek): posabel koppetje om licht/waarde te begrijpen, sluit aan op de waardenblockin.
+
 ## ⬜ Open ideeën — vergelijken & voortgang
 - 💡 **Onion-skinning** over schetsversies — je voortgang tijdens één tekening zien
 - 💡 Tijdlijn/vergelijk van opeenvolgende schetsfoto's

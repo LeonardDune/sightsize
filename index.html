@@ -170,6 +170,18 @@
           <label class="row" id="row-blockin-detail" hidden>Detail <input id="set-blockindetail" type="range" min="1" max="10" step="1"></label>
         </div>
 
+        <div class="ctx" data-modes="pan">
+          <h3>Constructie (Loomis)</h3>
+          <label class="row chk"><input id="set-con" type="checkbox"> Toon kopconstructie</label>
+          <p class="hint-txt">Een scaffold om tegen te tekenen: bal met kruis, wangvlakken, derde-indeling en kaak. Sleep de handvatten — <b>geel</b> = stand (draaien/kantelen), plus midden, straal (boven) en kin.</p>
+          <label class="row">Kleur <input id="set-con-color" type="color" value="#22d3ee"></label>
+          <label class="row">Dekking <input id="set-con-op" type="range" min="0.2" max="1" step="0.05"></label>
+          <div class="row btns">
+            <button id="btn-con-reset">Stand recht</button>
+            <button id="btn-con-place">Opnieuw plaatsen</button>
+          </div>
+        </div>
+
         <div class="ctx" data-modes="pan move draw">
           <h3>Lagen — volgorde &amp; dekking</h3>
           <p class="hint-txt">Bovenaan de lijst ligt bovenop. Gebruik ▲▼ om de volgorde te wijzigen, het oog om te tonen/verbergen, en de schuif voor de dekking per laag.</p>

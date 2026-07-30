@@ -288,6 +288,9 @@ function renderScene() {
     else { if (V.draw.cur) drawStrokes(ctx, [V.draw.cur]); drawEndpointHandles(ctx); }
   }
 
+  // Loomis-constructie-overlay
+  if (con().on && ov !== 'sketch') drawConstruction(ctx);
+
   // kleurnotities (vastgepinde stalen)
   if (st.showNotes && ov !== 'sketch') {
     const rr = 9 / V.view.s;
@@ -368,10 +371,12 @@ function renderScene() {
     ctx.stroke();
   }
 
-  // loep tijdens het verslepen van een eind- of vlakpunt
+  // loep tijdens het verslepen van een eind-, vlak- of constructiepunt
   if (V.mode === 'draw') {
     if (V.draw.editPt) drawLoupe(ctx, V.draw.editPt);
     else if (V.draw.vtx) drawLoupe(ctx, V.draw.vtx.pts[V.draw.vtx.i]);
+  } else if (V.mode === 'pan' && V.gesture && V.gesture.con) {
+    drawLoupe(ctx, V.gesture.con.get());
   }
 }
 
@@ -507,6 +512,176 @@ function drawLine(ctx, pts, color, lw) {
   ctx.lineTo(pts[1].x, pts[1].y);
   ctx.stroke();
   ctx.restore();
+}
+
+/* ---------- Loomis-kopconstructie (bal + kruis + kin) ---------- */
+function con() {
+  const s = session();
+  if (!s.construction) s.construction = newConstruction();
+  return s.construction;
+}
+function conInit() {
+  const c = con();
+  if (c._init && c.r > 0) return;
+  const ref = refItem().canvas;
+  c.cx = ref.width / 2;
+  c.cy = ref.height * 0.36;
+  c.r = Math.min(ref.width, ref.height) * 0.16;
+  c.nx = 0; c.ny = 0;
+  c.chinx = c.cx;
+  c.chiny = c.cy + c.r * 2.3;
+  c._init = true;
+}
+function cross3(a, b) {
+  return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
+}
+// orthonormaal kopframe uit de gezichtsnormaal (stand) en de kin-richting (rol)
+function conFrame(c) {
+  const nx = clamp(c.nx, -0.92, 0.92), ny = clamp(c.ny, -0.92, 0.92);
+  const nz = Math.sqrt(Math.max(0.02, 1 - nx * nx - ny * ny));
+  const fwd = { x: nx, y: ny, z: nz };
+  let dx = c.chinx - c.cx, dy = c.chiny - c.cy;
+  const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
+  let up = { x: -dx, y: -dy, z: (dx * nx + dy * ny) / nz };
+  const ul = Math.hypot(up.x, up.y, up.z) || 1; up = { x: up.x / ul, y: up.y / ul, z: up.z / ul };
+  let right = cross3(up, fwd);
+  const rl = Math.hypot(right.x, right.y, right.z) || 1; right = { x: right.x / rl, y: right.y / rl, z: right.z / rl };
+  return { fwd, up, right };
+}
+// framecoördinaat (a·right + b·up + cc·fwd) op de eenheidsbol → scherm + diepte
+function conProject(c, F, a, b, cc) {
+  return {
+    x: c.cx + c.r * (a * F.right.x + b * F.up.x + cc * F.fwd.x),
+    y: c.cy + c.r * (a * F.right.y + b * F.up.y + cc * F.fwd.y),
+    z: a * F.right.z + b * F.up.z + cc * F.fwd.z,
+  };
+}
+function conSeg(ctx, a, b, front, lw) {
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+  ctx.setLineDash(front ? [] : [5 / V.view.s, 5 / V.view.s]);
+  ctx.lineWidth = front ? lw : lw * 0.7;
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+// grootcirkel; 'vertical' = middellijn (up×fwd), 'horizontal' = brauwlijn (right×fwd)
+function conGreatCircle(ctx, c, F, kind, lw) {
+  const steps = 72;
+  let prev = null, prevF = null;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps * Math.PI * 2, co = Math.cos(t), si = Math.sin(t);
+    const P = kind === 'vertical' ? conProject(c, F, 0, co, si) : conProject(c, F, co, 0, si);
+    const front = P.z >= -0.02;
+    if (prev) conSeg(ctx, prev, P, front && prevF, lw);
+    prev = P; prevF = front;
+  }
+}
+// wangvlak: kleine cirkel op de bol op right-coördinaat = ±k
+function conSideCircle(ctx, c, F, k, lw) {
+  const rho = Math.sqrt(Math.max(0, 1 - k * k));
+  const steps = 48;
+  let prev = null, prevF = null;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps * Math.PI * 2, co = Math.cos(t), si = Math.sin(t);
+    const P = conProject(c, F, k, rho * co, rho * si);
+    const front = P.z >= -0.02;
+    if (prev) conSeg(ctx, prev, P, front && prevF, lw * 0.8);
+    prev = P; prevF = front;
+  }
+}
+const CON_K = 0.62;
+function conCheek(c, F, sign) {
+  return conProject(c, F, sign * CON_K, 0, Math.sqrt(1 - CON_K * CON_K));
+}
+function drawConFace(ctx, c, F, lw) {
+  const Fc = conProject(c, F, 0, 0, 1);       // gezichtsmidden (brauw)
+  const chin = { x: c.chinx, y: c.chiny };
+  let dx = chin.x - Fc.x, dy = chin.y - Fc.y;
+  const dl = Math.hypot(dx, dy) || 1, ux = dx / dl, uy = dy / dl, px = -uy, py = ux;
+  const tick = c.r * 0.5;
+  const markAt = (t, len) => {
+    const mx = Fc.x + ux * dl * t, my = Fc.y + uy * dl * t;
+    ctx.beginPath(); ctx.moveTo(mx - px * len, my - py * len); ctx.lineTo(mx + px * len, my + py * len); ctx.stroke();
+  };
+  ctx.setLineDash([]); ctx.lineWidth = lw * 0.8;
+  markAt(0, tick * 0.9);      // brauw
+  markAt(0.5, tick * 0.8);    // neusbasis
+  markAt(0.78, tick * 0.62);  // mond
+  const hb = dl * 0.5;        // haarlijn boven de brauw
+  ctx.beginPath();
+  ctx.moveTo(Fc.x - ux * hb - px * tick * 0.7, Fc.y - uy * hb - py * tick * 0.7);
+  ctx.lineTo(Fc.x - ux * hb + px * tick * 0.7, Fc.y - uy * hb + py * tick * 0.7);
+  ctx.stroke();
+  // kaaklijnen van de wangvlakken naar de kin
+  const cl = conCheek(c, F, -1), cr = conCheek(c, F, 1);
+  ctx.lineWidth = lw;
+  ctx.beginPath();
+  ctx.moveTo(cl.x, cl.y); ctx.lineTo(chin.x, chin.y);
+  ctx.moveTo(cr.x, cr.y); ctx.lineTo(chin.x, chin.y);
+  ctx.stroke();
+  ctx.beginPath(); ctx.arc(chin.x, chin.y, lw * 1.3, 0, Math.PI * 2); ctx.fillStyle = c.color; ctx.fill();
+}
+function conHandles(c) {
+  return [
+    { kind: 'center', x: c.cx, y: c.cy },
+    { kind: 'radius', x: c.cx, y: c.cy - c.r },
+    { kind: 'orient', x: c.cx + c.r * clamp(c.nx, -0.92, 0.92), y: c.cy + c.r * clamp(c.ny, -0.92, 0.92) },
+    { kind: 'chin', x: c.chinx, y: c.chiny },
+  ];
+}
+function drawConHandles(ctx, c) {
+  const rr = 7 / V.view.s;
+  ctx.save();
+  ctx.lineWidth = 1.6 / V.view.s;
+  for (const h of conHandles(c)) {
+    ctx.beginPath(); ctx.arc(h.x, h.y, rr, 0, Math.PI * 2);
+    ctx.fillStyle = h.kind === 'orient' ? '#ffd60a' : '#ffffffcc';
+    ctx.fill(); ctx.strokeStyle = '#000000aa'; ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawConstruction(ctx) {
+  conInit();
+  const c = con();
+  const F = conFrame(c);
+  ctx.save();
+  ctx.globalAlpha = c.opacity;
+  ctx.strokeStyle = c.color;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const lw = 2 / V.view.s;
+  ctx.setLineDash([]); ctx.lineWidth = lw;
+  ctx.beginPath(); ctx.arc(c.cx, c.cy, c.r, 0, Math.PI * 2); ctx.stroke(); // bal
+  conSideCircle(ctx, c, F, CON_K, lw);
+  conSideCircle(ctx, c, F, -CON_K, lw);
+  conGreatCircle(ctx, c, F, 'vertical', lw);
+  conGreatCircle(ctx, c, F, 'horizontal', lw);
+  drawConFace(ctx, c, F, lw);
+  ctx.restore();
+  if (V.mode === 'pan') drawConHandles(ctx, c);
+}
+// dichtstbijzijnde constructie-handvat om te verslepen (alleen in bekijken, indien aan)
+function hitConstructionHandle(p) {
+  const c = con();
+  if (!c.on) return null;
+  const tol = 16;
+  let best = null, bestD = tol;
+  for (const h of conHandles(c)) {
+    const d = dist(worldToScreen({ x: h.x, y: h.y }), p);
+    if (d < bestD) { bestD = d; best = h; }
+  }
+  if (!best) return null;
+  const kind = best.kind;
+  return {
+    kind,
+    get: () => { const h = conHandles(con()).find(x => x.kind === kind); return { x: h.x, y: h.y }; },
+    set: (w) => {
+      const cc = con();
+      if (kind === 'center') { const dx = w.x - cc.cx, dy = w.y - cc.cy; cc.cx = w.x; cc.cy = w.y; cc.chinx += dx; cc.chiny += dy; }
+      else if (kind === 'radius') cc.r = clamp(dist(w, { x: cc.cx, y: cc.cy }), 8, 100000);
+      else if (kind === 'orient') { cc.nx = clamp((w.x - cc.cx) / cc.r, -0.92, 0.92); cc.ny = clamp((w.y - cc.cy) / cc.r, -0.92, 0.92); }
+      else if (kind === 'chin') { cc.chinx = w.x; cc.chiny = w.y; }
+    },
+  };
 }
 
 /* ---------- hints ---------- */
@@ -1539,8 +1714,11 @@ function onPointerDown(e) {
   const p = eventPos(e);
   V.pointers.set(e.pointerId, p);
   if (V.pointers.size === 1) {
-    V.gesture = { type: 'single', start: p, last: p, moved: false, guide: null, adjust: null, drawing: false };
-    if (V.mode === 'pan') V.gesture.guide = hitGuide(p);
+    V.gesture = { type: 'single', start: p, last: p, moved: false, guide: null, adjust: null, con: null, drawing: false };
+    if (V.mode === 'pan') {
+      V.gesture.con = hitConstructionHandle(p); // handvatten van de kopconstructie eerst
+      if (!V.gesture.con) V.gesture.guide = hitGuide(p);
+    }
     V.gesture.adjust = hitAdjustPoint(p);
     if (V.gesture.adjust) { V.dragKind = V.gesture.adjust.kind; requestRender(); }
     else if (V.mode === 'draw' && V.draw.tool === 'shape') {
@@ -1601,6 +1779,8 @@ function onPointerMove(e) {
     if (g.adjust) {
       g.adjust.set(screenToWorld(p));
       updateHint();
+    } else if (g.con) {
+      g.con.set(screenToWorld(p));
     } else if (g.drawing) {
       const w = screenToWorld(p);
       if (V.draw.tool === 'shape') {
@@ -1795,6 +1975,10 @@ function syncPanel() {
   $('#set-flickerms').value = st.flickerMs;
   $('#set-grid').checked = st.grid;
   $('#set-gridsize').value = st.gridCm;
+  const c = con();
+  $('#set-con').checked = c.on;
+  $('#set-con-color').value = c.color;
+  $('#set-con-op').value = c.opacity;
   updateRefRows();
   refreshLayerStrip();
   renderOrderList();
@@ -2214,6 +2398,11 @@ function wireOverlay() {
   bind('#set-blvalues', 'change', e => { settings().blockinValues = e.target.checked; updateRefRows(); requestRender(); });
   bind('#set-blcontours', 'change', e => { settings().blockinContours = e.target.checked; updateRefRows(); requestRender(); });
   bind('#set-blockindetail', 'input', e => { settings().blockinDetail = +e.target.value; requestRender(); });
+  bind('#set-con', 'change', e => { con().on = e.target.checked; if (con().on) conInit(); requestRender(); });
+  bind('#set-con-color', 'input', e => { con().color = e.target.value; requestRender(); });
+  bind('#set-con-op', 'input', e => { con().opacity = +e.target.value; requestRender(); });
+  bind('#btn-con-reset', 'click', () => { con().nx = 0; con().ny = 0; requestRender(); });
+  bind('#btn-con-place', 'click', () => { con()._init = false; conInit(); con().on = true; $('#set-con').checked = true; requestRender(); });
   bind('#set-drawcolor', 'input', e => { settings().drawColor = e.target.value; });
   bind('#set-drawwidth', 'input', e => { settings().drawWidth = +e.target.value; });
   bind('#btn-eraser', 'click', () => {
