@@ -72,6 +72,8 @@ function defaultSettings() {
     opacity: 0.55, sketchMode: 'original', blend: 'normal', lineColor: '#ff3b30',
     refMode: 'color', refLevels: 4, refThreshold: 128, refBlur: 2, refIsolate: -1,
     showRef: true, showSketch: true, showDrawing: true,
+    layerOrder: ['ref', 'blockin', 'drawing', 'values', 'sketch'], // onder → boven
+    layerOpacity: { ref: 1, blockin: 1, drawing: 1, values: 1 }, // schets gebruikt 'opacity'
     blockinValues: false, blockinContours: false, blockinDetail: 5,
     drawColor: '#22c55e', drawWidth: 6, drawSnap: true,
     valueN: 4, showValues: true, valueReveal: false,

@@ -159,6 +159,104 @@ function visibilityOverride() {
   return null;
 }
 
+/* ---------- inhoudslagen: volgorde en dekking ---------- */
+const LAYER_GROUPS = ['ref', 'blockin', 'drawing', 'values', 'sketch'];
+const LAYER_NAMES = { ref: 'Foto', blockin: 'Auto-lijnen', drawing: 'Tekening (lijnen)', values: 'Waardenvlakken', sketch: 'Schets' };
+
+// geldige, complete volgorde teruggeven (ontbrekende groepen aanvullen, onbekende weglaten)
+function layerOrderList() {
+  const st = settings();
+  let ord = Array.isArray(st.layerOrder) ? st.layerOrder.filter(g => LAYER_GROUPS.includes(g)) : [];
+  for (const g of LAYER_GROUPS) if (!ord.includes(g)) ord.push(g);
+  st.layerOrder = ord;
+  return ord;
+}
+function groupOpacity(gp) {
+  const st = settings();
+  if (gp === 'sketch') return st.opacity;
+  const o = st.layerOpacity && st.layerOpacity[gp];
+  return o == null ? 1 : o;
+}
+
+function drawRefGroup(ctx, ov) {
+  const st = settings();
+  const ref = refItem();
+  ctx.globalAlpha = ov === 'sketch' ? 0.25 : (ov === 'ref' ? 1 : groupOpacity('ref'));
+  if (st.showRef || ov === 'ref') {
+    ctx.drawImage(refView(), 0, 0);
+  } else if (!ov) {
+    ctx.fillStyle = Theme.paper;
+    ctx.fillRect(0, 0, ref.canvas.width, ref.canvas.height);
+  }
+  ctx.globalAlpha = 1;
+  // palet-highlight hoort bij de foto: dim alles buiten de gekozen kleurcluster
+  const pc = paletteHighlightCanvas();
+  if (pc && ov !== 'sketch') ctx.drawImage(pc, 0, 0, ref.canvas.width, ref.canvas.height);
+}
+
+function drawSketchGroup(ctx, ov) {
+  const st = settings();
+  const sk = activeSketch();
+  let alpha = st.showSketch ? st.opacity : 0;
+  if (ov === 'ref') alpha = 0;
+  else if (ov === 'sketch') alpha = 1;
+  if (V.flickerHidden && !ov) alpha = 0;
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (st.blend === 'difference' && !ov) ctx.globalCompositeOperation = 'difference';
+  const T = sk.transform;
+  ctx.transform(T.a, T.b, -T.b, T.a, T.tx, T.ty);
+  ctx.drawImage(st.sketchMode === 'lines' ? sketchLines(sk) : sk.canvas, 0, 0);
+  ctx.restore();
+}
+
+function drawBlockinGroup(ctx) {
+  const bl = blockinLines();
+  if (!bl) return;
+  ctx.save();
+  ctx.globalAlpha = groupOpacity('blockin');
+  ctx.lineWidth = 2 / V.view.s;
+  ctx.lineJoin = 'round';
+  const drawPolys = (polys, color) => {
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    for (const poly of polys) {
+      ctx.moveTo(poly[0].x, poly[0].y);
+      for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+    }
+    ctx.stroke();
+  };
+  drawPolys(bl.values, '#ff9f1a');
+  drawPolys(bl.contours, '#38bdf8');
+  ctx.restore();
+}
+
+function drawLineGroup(ctx) {
+  const st = settings();
+  if (!st.showDrawing) return;
+  ctx.save();
+  ctx.globalAlpha = groupOpacity('drawing');
+  const layers = drawingLayers();
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const L = layers[i];
+    if (L.visible && L.kind !== 'values') drawStrokes(ctx, L.strokes);
+  }
+  ctx.restore();
+}
+
+function drawValuesGroup(ctx) {
+  const st = settings();
+  if (!st.showValues) return;
+  const N = st.valueN;
+  const go = groupOpacity('values');
+  const layers = drawingLayers();
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const L = layers[i];
+    if (L.visible && L.kind === 'values') drawValueShapes(ctx, L, N, go);
+  }
+}
+
 function renderScene() {
   if (App.phase !== 'overlay' || !refItem() || !activeSketch()) return;
   resizeViewCanvas();
@@ -173,74 +271,21 @@ function renderScene() {
   ctx.translate(V.view.tx, V.view.ty);
   ctx.scale(V.view.s, V.view.s);
 
-  // referentie: foto, of leeg "papier" als de fotolaag uitstaat
+  // inhoudslagen in de door de gebruiker gekozen stapelvolgorde (onder → boven)
   const ref = refItem();
-  ctx.globalAlpha = ov === 'sketch' ? 0.25 : 1;
-  if (st.showRef) {
-    ctx.drawImage(refView(), 0, 0);
-  } else {
-    ctx.fillStyle = Theme.paper;
-    ctx.fillRect(0, 0, ref.canvas.width, ref.canvas.height);
-  }
-  ctx.globalAlpha = 1;
-
-  // schets
-  const sk = activeSketch();
-  let alpha = st.showSketch ? st.opacity : 0;
-  if (ov === 'ref') alpha = 0;
-  else if (ov === 'sketch') alpha = 1;
-  if (V.flickerHidden && !ov) alpha = 0;
-  if (alpha > 0) {
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    if (st.blend === 'difference' && !ov) ctx.globalCompositeOperation = 'difference';
-    const T = sk.transform;
-    ctx.transform(T.a, T.b, -T.b, T.a, T.tx, T.ty);
-    ctx.drawImage(st.sketchMode === 'lines' ? sketchLines(sk) : sk.canvas, 0, 0);
-    ctx.restore();
+  for (const gp of layerOrderList()) {
+    if (gp === 'ref') drawRefGroup(ctx, ov);
+    else if (gp === 'sketch') drawSketchGroup(ctx, ov);
+    else if (ov === 'sketch') continue; // bij "alleen schets" andere lagen verbergen
+    else if (gp === 'blockin') drawBlockinGroup(ctx);
+    else if (gp === 'drawing') drawLineGroup(ctx);
+    else if (gp === 'values') drawValuesGroup(ctx);
   }
 
-  // palet-highlight: dim alles buiten de gekozen kleurcluster
-  const pc = paletteHighlightCanvas();
-  if (pc && ov !== 'sketch') {
-    ctx.drawImage(pc, 0, 0, ref.canvas.width, ref.canvas.height);
-  }
-
-  // blockin-lijnen over de referentie
-  const bl = blockinLines();
-  if (bl && ov !== 'sketch') {
-    ctx.save();
-    ctx.lineWidth = 2 / V.view.s;
-    ctx.lineJoin = 'round';
-    const drawPolys = (polys, color) => {
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      for (const poly of polys) {
-        ctx.moveTo(poly[0].x, poly[0].y);
-        for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
-      }
-      ctx.stroke();
-    };
-    drawPolys(bl.values, '#ff9f1a');
-    drawPolys(bl.contours, '#38bdf8');
-    ctx.restore();
-  }
-
-  // eigen tekening + waardenvlakken: onderaan de lijst = onderop getekend
-  if (ov !== 'sketch') {
-    const layers = drawingLayers();
-    const N = st.valueN;
-    for (let i = layers.length - 1; i >= 0; i--) {
-      const L = layers[i];
-      if (!L.visible) continue;
-      if (L.kind === 'values') { if (st.showValues) drawValueShapes(ctx, L, N); }
-      else if (st.showDrawing) drawStrokes(ctx, L.strokes);
-    }
-    if (st.showDrawing && V.draw.cur) drawStrokes(ctx, [V.draw.cur]);
-    if (V.mode === 'draw') {
-      if (V.draw.tool === 'shape') { drawShapeInProgress(ctx); drawShapeHandles(ctx); }
-      else drawEndpointHandles(ctx);
-    }
+  // wat je nu aan het tekenen bent + de grepen: altijd bovenop en op volle dekking
+  if (V.mode === 'draw' && ov !== 'sketch') {
+    if (V.draw.tool === 'shape') { drawShapeInProgress(ctx); drawShapeHandles(ctx); }
+    else { if (V.draw.cur) drawStrokes(ctx, [V.draw.cur]); drawEndpointHandles(ctx); }
   }
 
   // kleurnotities (vastgepinde stalen)
@@ -777,7 +822,13 @@ function activeLayer() {
   return d.layers[d.active];
 }
 
-// verzamel alle "vastklik"-punten: lijnuiteinden én vlakhoekpunten (voor aansluiten)
+// hoekpunten van het canvas (referentievlak) — handig om precies op de rand te mikken
+function canvasCorners() {
+  const c = refItem().canvas;
+  return [{ x: 0, y: 0 }, { x: c.width, y: 0 }, { x: c.width, y: c.height }, { x: 0, y: c.height }];
+}
+
+// verzamel alle "vastklik"-punten: lijnuiteinden, vlakhoekpunten én canvas-hoeken
 function snapCandidates(exclude) {
   const out = [];
   for (const layer of drawingLayers()) {
@@ -788,6 +839,7 @@ function snapCandidates(exclude) {
       for (const s of layer.strokes) for (const p of [s.pts[0], s.pts[s.pts.length - 1]]) { if (p !== exclude) out.push(p); }
     }
   }
+  for (const c of canvasCorners()) out.push(c);
   return out;
 }
 
@@ -815,6 +867,9 @@ function snapSegments(exclude, excludeShape) {
       }
     }
   }
+  // randen van het canvas
+  const cc = canvasCorners();
+  for (let i = 0; i < 4; i++) segs.push({ a: cc[i], b: cc[(i + 1) % 4] });
   return segs;
 }
 
@@ -915,7 +970,7 @@ function shapeLum(sh) {
   return sh._lum;
 }
 
-function drawValueShapes(ctx, layer, N) {
+function drawValueShapes(ctx, layer, N, groupAlpha = 1) {
   const reveal = settings().valueReveal;
   const lop = layer.opacity == null ? 1 : layer.opacity;
   for (const sh of layer.shapes) {
@@ -935,7 +990,7 @@ function drawValueShapes(ctx, layer, N) {
       fill = `rgb(${g},${g},${g})`;
     }
     ctx.save();
-    ctx.globalAlpha = clamp(lop * (sh.opacity == null ? 1 : sh.opacity), 0, 1);
+    ctx.globalAlpha = clamp(groupAlpha * lop * (sh.opacity == null ? 1 : sh.opacity), 0, 1);
     ctx.fillStyle = fill;
     tracePoly(ctx, sh.pts);
     ctx.fill();
@@ -1742,6 +1797,7 @@ function syncPanel() {
   $('#set-gridsize').value = st.gridCm;
   updateRefRows();
   refreshLayerStrip();
+  renderOrderList();
 }
 
 /* ---------- persistente lagenstrook ---------- */
@@ -1755,6 +1811,65 @@ function refreshLayerStrip() {
     chip.classList.toggle('off', !on);
     chip.querySelector('.eye').innerHTML = svgIcon(on ? 'eye' : 'eyeOff');
   }
+}
+
+function groupVisible(gp) {
+  const st = settings();
+  if (gp === 'ref') return st.showRef;
+  if (gp === 'sketch') return st.showSketch;
+  if (gp === 'drawing') return st.showDrawing;
+  if (gp === 'values') return st.showValues;
+  if (gp === 'blockin') return autoLinesOn();
+  return true;
+}
+
+// stapelvolgorde van een inhoudslaag wijzigen (+1 = naar boven op de stapel)
+function moveGroup(gp, dir) {
+  const order = layerOrderList();
+  const i = order.indexOf(gp);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  renderOrderList();
+  requestRender();
+}
+
+function renderOrderList() {
+  const box = $('#order-list');
+  if (!box) return;
+  const st = settings();
+  box.innerHTML = '';
+  const top = layerOrderList().slice().reverse(); // boven in de lijst = bovenop
+  top.forEach((gp, di) => {
+    const row = document.createElement('div');
+    row.className = 'order-row' + (groupVisible(gp) ? '' : ' off');
+    const up = document.createElement('button');
+    up.className = 'mv'; up.innerHTML = svgIcon('chevUp'); up.title = 'Naar boven'; up.disabled = di === 0;
+    up.addEventListener('click', () => moveGroup(gp, +1));
+    const down = document.createElement('button');
+    down.className = 'mv'; down.innerHTML = svgIcon('chevDown'); down.title = 'Naar onder'; down.disabled = di === top.length - 1;
+    down.addEventListener('click', () => moveGroup(gp, -1));
+    const vis = document.createElement('button');
+    vis.className = 'vis';
+    const on = groupVisible(gp);
+    vis.innerHTML = svgIcon(on ? 'eye' : 'eyeOff');
+    vis.title = on ? 'Verbergen' : 'Tonen';
+    vis.addEventListener('click', () => toggleLayer(gp));
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = LAYER_NAMES[gp];
+    const op = document.createElement('input');
+    op.type = 'range'; op.min = 0; op.max = 1; op.step = 0.05; op.className = 'op';
+    op.value = gp === 'sketch' ? st.opacity : (st.layerOpacity && st.layerOpacity[gp] != null ? st.layerOpacity[gp] : 1);
+    op.addEventListener('input', () => {
+      const v = +op.value;
+      if (gp === 'sketch') { st.opacity = v; const so = $('#set-opacity'); if (so) so.value = v; }
+      else { st.layerOpacity = st.layerOpacity || {}; st.layerOpacity[gp] = v; }
+      requestRender();
+    });
+    row.append(up, down, vis, name, op);
+    box.appendChild(row);
+  });
 }
 
 function toggleLayer(which) {
@@ -1778,6 +1893,7 @@ function toggleLayer(which) {
   }
   updateRefRows();
   refreshLayerStrip();
+  renderOrderList();
   requestRender();
 }
 
@@ -2081,7 +2197,11 @@ function wireOverlay() {
   $('#btn-align-redo').addEventListener('click', () => setMode('align'));
 
   const bind = (id, ev, fn) => $(id).addEventListener(ev, fn);
-  bind('#set-opacity', 'input', e => { settings().opacity = +e.target.value; requestRender(); });
+  bind('#set-opacity', 'input', e => {
+    settings().opacity = +e.target.value;
+    renderOrderList(); // schets-dekking staat ook in de lagenlijst
+    requestRender();
+  });
   bind('#set-sketchmode', 'change', e => { settings().sketchMode = e.target.value; requestRender(); });
   bind('#set-linecolor', 'change', e => { settings().lineColor = e.target.value; requestRender(); });
   bind('#set-blend', 'change', e => { settings().blend = e.target.value; requestRender(); });

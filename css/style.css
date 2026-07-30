@@ -571,6 +571,17 @@ input:disabled { opacity: 0.45; }
 .layer-head span { flex: 1; }
 .layer-row .kind { display: inline-grid; place-items: center; color: var(--muted); flex: 0 0 auto; }
 .layer-row .kind .ico { width: 15px; height: 15px; }
+
+/* inhoudslagen: volgorde & dekking */
+.order-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.order-row { display: flex; align-items: center; gap: 4px; background: var(--bg2); border-radius: 8px; padding: 4px 6px; }
+.order-row.off { opacity: 0.5; }
+.order-row .mv, .order-row .vis { background: none; border: none; color: var(--fg); cursor: pointer; padding: 2px; display: inline-grid; place-items: center; border-radius: 6px; }
+.order-row .mv[disabled] { opacity: 0.3; cursor: default; }
+.order-row .mv:hover:not([disabled]), .order-row .vis:hover { background: var(--bg3); }
+.order-row .mv .ico, .order-row .vis .ico { width: 15px; height: 15px; }
+.order-row .name { flex: 1; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.order-row .op { width: 82px; flex: 0 0 auto; }
 .panel .row.chk { justify-content: flex-start; }
 .panel .row.chk input { accent-color: var(--accent); width: 18px; height: 18px; }
 .panel .row.btns { flex-wrap: wrap; justify-content: flex-start; }
