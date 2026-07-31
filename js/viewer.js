@@ -1166,9 +1166,21 @@ function drawValueShapes(ctx, layer, N, groupAlpha = 1) {
     }
     ctx.save();
     ctx.globalAlpha = clamp(groupAlpha * lop * (sh.opacity == null ? 1 : sh.opacity), 0, 1);
-    ctx.fillStyle = fill;
-    tracePoly(ctx, sh.pts);
-    ctx.fill();
+    if (settings().valueOutline) {
+      // alleen een rand naar binnen: knip op het vlak en streek de omtrek eroverheen;
+      // de buitenste helft valt buiten de clip, dus blijft een band binnen de vorm over
+      tracePoly(ctx, sh.pts);
+      ctx.clip();
+      ctx.strokeStyle = fill;
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 2 * settings().valueOutlineW / V.view.s; // helft blijft binnen = ingestelde dikte
+      tracePoly(ctx, sh.pts);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = fill;
+      tracePoly(ctx, sh.pts);
+      ctx.fill();
+    }
     ctx.restore();
     if (V.mode === 'draw' && V.draw.tool === 'shape' && V.draw.selShape && V.draw.selShape.shape === sh) {
       ctx.save();
@@ -1965,6 +1977,9 @@ function syncPanel() {
   const vl0 = valueLayers()[0];
   $('#set-vlayer-op').value = vl0 ? (vl0.opacity == null ? 1 : vl0.opacity) : 1;
   $('#set-valuereveal').checked = st.valueReveal;
+  $('#set-valueoutline').checked = st.valueOutline;
+  $('#set-valueoutlinew').value = st.valueOutlineW;
+  $('#row-valueoutlinew').hidden = !st.valueOutline;
   $('#set-samplerad').value = st.sampleRadius;
   buildVScale();
   $('#set-palk').value = st.paletteK;
@@ -2446,6 +2461,12 @@ function wireOverlay() {
   bind('#set-vshape-op', 'input', e => { if (V.draw.selShape) { V.draw.selShape.shape.opacity = +e.target.value; requestRender(); } });
   bind('#btn-vshape-op-reset', 'click', () => { if (V.draw.selShape) { V.draw.selShape.shape.opacity = 1; $('#set-vshape-op').value = 1; requestRender(); } });
   bind('#set-valuereveal', 'change', e => { settings().valueReveal = e.target.checked; requestRender(); });
+  bind('#set-valueoutline', 'change', e => {
+    settings().valueOutline = e.target.checked;
+    $('#row-valueoutlinew').hidden = !e.target.checked;
+    requestRender();
+  });
+  bind('#set-valueoutlinew', 'input', e => { settings().valueOutlineW = +e.target.value; requestRender(); });
   bind('#btn-vshape-del', 'click', () => {
     if (!V.draw.selShape) return;
     const arr = V.draw.selShape.layer.shapes;

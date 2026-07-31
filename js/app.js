@@ -76,7 +76,7 @@ function defaultSettings() {
     layerOpacity: { ref: 1, blockin: 1, drawing: 1, values: 1 }, // schets gebruikt 'opacity'
     blockinValues: false, blockinContours: false, blockinDetail: 5,
     drawColor: '#22c55e', drawWidth: 6, drawSnap: true,
-    valueN: 4, showValues: true, valueReveal: false,
+    valueN: 4, showValues: true, valueReveal: false, valueOutline: false, valueOutlineW: 6,
     sampleRadius: 8, paletteK: 6, showNotes: true, mixTarget: 'sample',
     flicker: false, flickerMs: 600, grid: false, gridCm: 5,
   };

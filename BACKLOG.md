@@ -34,7 +34,7 @@ Legenda: ✅ gebouwd · 🔜 volgende ronde · ⬜ open idee · 💡 optioneel/l
 - ✅ Rechttrekken met Ramer–Douglas–Peucker; detail-slider; elk apart schakelbaar
 
 **Eigen tekening (blockin)**
-- ✅ **Eigen waardenvlakken**: polygonen met rechte randen, elk gevuld met één grijswaarde uit een instelbaar aantal (2–9). Bron-waarde per vlak; weergave niet-destructief afgerond op N (dichtstbijzijnde grijs), zodat de slider je blockin live herposterizet. Waarde via de N-strook of pipet op de referentie; zelfcheck (gemeten referentiewaarde vs keuze) + "onthul"-kleuring; dekking per vlak én per laag met reset. Eigen laagtype naast de lijnlagen, met chip in de lagenstrook. Vergelijkbaar met de posterize-"waarden" en de auto-waardenlijnen.
+- ✅ **Eigen waardenvlakken**: polygonen met rechte randen, elk gevuld met één grijswaarde uit een instelbaar aantal (2–9). Bron-waarde per vlak; weergave niet-destructief afgerond op N (dichtstbijzijnde grijs), zodat de slider je blockin live herposterizet. Waarde via de N-strook of pipet op de referentie; zelfcheck (gemeten referentiewaarde vs keuze) + "onthul"-kleuring; dekking per vlak én per laag met reset. Eigen laagtype naast de lijnlagen, met chip in de lagenstrook. Vergelijkbaar met de posterize-"waarden" en de auto-waardenlijnen. **"Alleen randen"-modus**: vlakken als omtrek (instelbare randdikte), naar binnen berekend zodat aansluitende randen niet overlappen — om waarden én randen tegen de schets te leggen.
 - ✅ Rechte lijnstukken met snap-toggle; eindpunten los verslepen (met loep)
 - ✅ Gum per lijn, ongedaan maken, laag wissen
 - ✅ Meerdere tekenlagen: zichtbaar-toggle, hernoemen, activeren, verwijderen, **volgorde slepen**
